@@ -14,6 +14,7 @@ import numpy as np
 import time
 from datetime import datetime
 from scipy.spatial.distance import directed_hausdorff
+import os
 
 
 ### Define Class container for training procedure ###
@@ -71,6 +72,10 @@ class SCGAN():
             discriminator_optimizer=self.disc_optimizer,
             generator=self.generator,
             discriminator=self.discriminator)
+
+        # Create checkpoint directory if it doesn't already exist
+        if not os.path.isdir(f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}"):
+            os.mkdir(f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}")
 
 
     ### Define Network Architecture ###
@@ -231,7 +236,7 @@ Test set size = {self.test_data_n}
 
             # Evaluate the model every 2000 epochs
             if (epoch + 1) % 2000 == 0:
-                self.evaaluate_model(epoch)
+                self.evaluate_model(epoch)
 
         
         print("[INFO] training completed in {} seconds!".format(round(time.time()-start, 2)))
@@ -256,16 +261,18 @@ Test set size = {self.test_data_n}
         plt.ylabel('Validation Loss')
         plt.xlabel('Epoch')
         plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right')
-        plt.savefig(fname=f"{self.CHECKPOINT_PATH}\{self.FILE_NAME}\losses_plot.png")
+        plt.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses_plot.png")
 
         # Save losses as csv
-        np.savetxt(fname=f"{self.CHECKPOINT_PATH}\{self.FILE_NAME}\losses.csv", X = combined_losses, delimiter=",")
+        np.savetxt(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses.csv", X = combined_losses, delimiter=",")
 
         return None
 
 
     # Define a function to evaluate the model
     def evaluate_model(self, epoch):
+
+        print("[INFO] evaluating model")
 
         def hausdorff_dist(real_samples, gen_samples):
             dist = directed_hausdorff(
@@ -303,21 +310,21 @@ Test set size = {self.test_data_n}
         
         # Visualise the validation set
         fig, axs = plt.subplots(1, 2)
-        fig.title(f"Generator Validation at epoch {epoch}")
+        fig.suptitle(f"Generator Validation at epoch {epoch}")
 
         # PCA plot
         axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], label = "Generated", c = "red")
         axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], label = "Real", c = "blue")
-        axs[0].subtitle(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
-        axs[0].xlabel("PC1")
-        axs[0].ylabel("PC2")
+        axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
+        axs[0].set_xlabel("PC1")
+        axs[0].set_ylabel("PC2")
 
         # t-SNE plot
         axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = "red")
         axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = "blue")
-        axs[1].subtitle(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
-        axs[1].xlabel("t-SNE 1")
-        axs[1].ylabel("t-SNE 2")
+        axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
+        axs[1].set_xlabel("t-SNE 1")
+        axs[1].set_ylabel("t-SNE 2")
         
         fig.legend(loc = "lower center", ncol = 2)
-        fig.savefig(fname=f"{self.CHECKPOINT_PATH}\{self.FILE_NAME}\{epoch}_validation_plot.png")
+        fig.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\epoch_{epoch}_validation_plot.png")
