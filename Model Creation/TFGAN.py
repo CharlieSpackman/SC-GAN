@@ -8,6 +8,7 @@ from tensorflow.keras.layers import LeakyReLU, Activation, Dense
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -225,8 +226,12 @@ Test set size = {self.test_data_n}
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
             # Save the model every 50 epochs
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 50 == 0:
                 self.create_checkpoint(epoch)
+
+            # Evaluate the model every 2000 epochs
+            if (epoch + 1) % 2000 == 0:
+                self.evaaluate_model(epoch)
 
         
         print("[INFO] training completed in {} seconds!".format(round(time.time()-start, 2)))
@@ -260,7 +265,15 @@ Test set size = {self.test_data_n}
 
 
     # Define a function to evaluate the model
-    def evaluate_model(self):
+    def evaluate_model(self, epoch):
+
+        def hausdorff_dist(real_samples, gen_samples):
+            dist = directed_hausdorff(
+                u = real_samples,
+                v = gen_samples
+            )[0]
+
+            return dist
 
         # Create generated validation data
         generated_samples = self.generator(self.val_noise, training=False)
@@ -274,22 +287,37 @@ Test set size = {self.test_data_n}
             tf.ones(self.test_data_n)),
             axis = 0)
 
-        # Reduce the dataset
-        validation_set_reduced = PCA(n_components=2).fit_transform(validation_set)
-        generated_samples_reduced = validation_set_reduced[validation_labels==0]
-        test_set_reduced = validation_set_reduced[validation_labels==1]
-
+        # Reduce the dataset with PCA
+        validation_set_reduced_PCA = PCA(n_components=2).fit_transform(validation_set)
+        generated_samples_reduced_PCA = validation_set_reduced_PCA[validation_labels==0]
+        test_set_reduced_PCA = validation_set_reduced_PCA[validation_labels==1]
         # Calculate the correlation between samples
-        hausdorff_dist = directed_hausdorff(
-            u = generated_samples_reduced,
-            v = test_set_reduced
-        )[0]
+        hausdorff_dist_PCA = hausdorff_dist(test_set_reduced_PCA, generated_samples_reduced_PCA)
 
+        # Reduce the dataset with t-SNE
+        validation_set_reduced_TSNE = TSNE(n_components=2).fit_transform(validation_set)
+        generated_samples_reduced_TSNE = validation_set_reduced_TSNE[validation_labels==0]
+        test_set_reduced_TSNE = validation_set_reduced_TSNE[validation_labels==1]
+        # Calculate the correlation between samples
+        hausdorff_dist_TSNE = hausdorff_dist(test_set_reduced_TSNE, generated_samples_reduced_TSNE)
+        
         # Visualise the validation set
-        plt.scatter(generated_samples_reduced[:,0], generated_samples_reduced[:,1], label = "Generated", c = "red")
-        plt.scatter(test_set_reduced[:,0], test_set_reduced[:,1], label = "Real", c = "blue")
-        plt.legend(loc = "lower center", ncol = 2)
-        plt.title(f"Generator Validation - Hausdorff dist: {round(hausdorff_dist,2)}")
-        plt.xlabel("PC1")
-        plt.ylabel("PC2")
-        plt.savefig(fname=f"{self.CHECKPOINT_PATH}\{self.FILE_NAME}\\validation_plot.png")
+        fig, axs = plt.subplots(1, 2)
+        fig.title(f"Generator Validation at epoch {epoch}")
+
+        # PCA plot
+        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], label = "Generated", c = "red")
+        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], label = "Real", c = "blue")
+        axs[0].subtitle(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
+        axs[0].xlabel("PC1")
+        axs[0].ylabel("PC2")
+
+        # t-SNE plot
+        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = "red")
+        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = "blue")
+        axs[1].subtitle(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
+        axs[1].xlabel("t-SNE 1")
+        axs[1].ylabel("t-SNE 2")
+        
+        fig.legend(loc = "lower center", ncol = 2)
+        fig.savefig(fname=f"{self.CHECKPOINT_PATH}\{self.FILE_NAME}\{epoch}_validation_plot.png")
