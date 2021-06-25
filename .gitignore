@@ -1,0 +1,6 @@
+Data Preprocessing/Raw data/
+Data Preprocessing/cache/
+.vscode/
+**/*.csv
+**/*.h5ad
+**/*.sh
