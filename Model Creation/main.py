@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 
 # Read in the data
-data = pd.read_csv("data.csv", delimiter = ",")
-data = data.iloc[1000:, 1:].to_numpy()
+data = pd.read_csv("..\\data.csv", delimiter = ",")
+data = data.iloc[:, 1:].to_numpy()
 print("[INFO] Data successfully loaded")
 
 # Create GAN Class
@@ -15,7 +15,7 @@ gan = SCGAN(
     data = data,
     CHECKPOINT_PATH = "models", 
     LRATE = 0.001, 
-    EPOCHS = 3, 
+    EPOCHS = 10000, 
     BATCH_SIZE = 256, 
     NOISE_DIM = 100, 
     SEED = 36)

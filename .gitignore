@@ -1,5 +1,6 @@
 Data Preprocessing/Raw data/
 Data Preprocessing/cache/
+models/
 .vscode/
 **/*.csv
 **/*.h5ad

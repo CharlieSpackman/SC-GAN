@@ -20,7 +20,7 @@ import os
 ### Define Class container for training procedure ###
 class SCGAN():
 
-    def __init__(self, data, CHECKPOINT_PATH = "models", LRATE = 0.001, EPOCHS = 10000, BATCH_SIZE = 50, NOISE_DIM = 100, SEED = 36):
+    def __init__(self, data, CHECKPOINT_PATH = "..\\models", LRATE = 0.001, EPOCHS = 10000, BATCH_SIZE = 50, NOISE_DIM = 100, SEED = 36):
         
         self.data = data
 
@@ -231,11 +231,11 @@ Test set size = {self.test_data_n}
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
             # Save the model every 50 epochs
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 5 == 0:
                 self.create_checkpoint(epoch)
 
             # Evaluate the model every 2000 epochs
-            if (epoch + 1) % 2000 == 0:
+            if (epoch + 1) % 20 == 0:
                 self.evaluate_model(epoch)
 
         
@@ -262,6 +262,7 @@ Test set size = {self.test_data_n}
         plt.xlabel('Epoch')
         plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right')
         plt.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses_plot.png")
+        plt.clf()
 
         # Save losses as csv
         np.savetxt(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses.csv", X = combined_losses, delimiter=",")
@@ -328,3 +329,4 @@ Test set size = {self.test_data_n}
         
         fig.legend(loc = "lower center", ncol = 2)
         fig.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\epoch_{epoch}_validation_plot.png")
+        plt.clf() 
