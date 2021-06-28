@@ -15,12 +15,24 @@ import time
 from datetime import datetime
 from scipy.spatial.distance import directed_hausdorff
 import os
+from pathlib import Path
 
+# Define a helper function for handling paths
+def get_path(path):
+
+    return str(Path(path).resolve())
 
 ### Define Class container for training procedure ###
 class SCGAN():
 
-    def __init__(self, data, CHECKPOINT_PATH = "..\\models", LRATE = 0.001, EPOCHS = 10000, BATCH_SIZE = 50, NOISE_DIM = 100, SEED = 36):
+    def __init__(self, 
+        data, 
+        CHECKPOINT_PATH = get_path("../models"), 
+        LRATE = 0.001, 
+        EPOCHS = 10000, 
+        BATCH_SIZE = 50, 
+        NOISE_DIM = 100, 
+        SEED = 36):
         
         self.data = data
 
@@ -74,8 +86,11 @@ class SCGAN():
             discriminator=self.discriminator)
 
         # Create checkpoint directory if it doesn't already exist
-        if not os.path.isdir(f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}"):
-            os.mkdir(f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}")
+        p = Path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}")
+        if not p.exists():
+            p.mkdir()
+            p.joinpath("images").mkdir()
+            p.joinpath("data").mkdir()
 
 
     ### Define Network Architecture ###
@@ -134,6 +149,16 @@ class SCGAN():
 
         return None
 
+    # Define a functon to get the models
+    def get_models(self):
+
+        return self.generator, self.discriminator
+
+    # Define a function to get the checkpoint option
+    def get_checkpoint_obj(self):
+
+        return self.checkpoint
+
     # Define a function to print learning parameters
     def get_learning_parameters(self):
 
@@ -169,10 +194,10 @@ Test set size = {self.test_data_n}
 
     def create_checkpoint(self, epoch):
 
-        path = "{}\\{}\\epochs\\{:05d}\\ckpt".format(
+        path = get_path("{}/{}/epochs/{:05d}/ckpt".format(
             self.CHECKPOINT_PATH,
             self.FILE_NAME,
-            epoch+1)
+            epoch+1))
 
         print("[INFO] creating checkpoint")
         self.checkpoint.save(file_prefix = path)
@@ -261,11 +286,11 @@ Test set size = {self.test_data_n}
         plt.ylabel('Validation Loss')
         plt.xlabel('Epoch')
         plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right')
-        plt.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses_plot.png")
+        plt.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/losses_plot.png"))
         plt.clf()
 
         # Save losses as csv
-        np.savetxt(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\losses.csv", X = combined_losses, delimiter=",")
+        np.savetxt(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/losses.csv"), X = combined_losses, delimiter=",")
 
         return None
 
@@ -328,5 +353,5 @@ Test set size = {self.test_data_n}
         axs[1].set_ylabel("t-SNE 2")
         
         fig.legend(loc = "lower center", ncol = 2)
-        fig.savefig(fname=f"{self.CHECKPOINT_PATH}\\{self.FILE_NAME}\\epoch_{epoch}_validation_plot.png")
-        plt.clf() 
+        fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/epoch_{epoch}_validation_plot.png"))
+        plt.clf()

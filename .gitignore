@@ -1,7 +1,8 @@
-Data Preprocessing/Raw data/
-Data Preprocessing/cache/
+DataPreprocessing/Raw data/
+DataPreprocessing/cache/
 models/
 .vscode/
 **/*.csv
 **/*.h5ad
 **/*.sh
+**/*.pyc
