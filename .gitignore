@@ -1,4 +1,4 @@
-DataPreprocessing/Raw data/
+DataPreprocessing/GSE114727/
 DataPreprocessing/cache/
 models/
 .vscode/
@@ -6,3 +6,4 @@ models/
 **/*.h5ad
 **/*.sh
 **/*.pyc
+**/*.tsv

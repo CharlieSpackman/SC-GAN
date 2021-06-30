@@ -52,20 +52,26 @@ discriminator_hidden = tf.keras.Model(discriminator.input, discriminator.layers[
 # Reduce the dimensionality of the data using the Discriminator
 data_gan_reduced = discriminator_hidden(data)
 
-# Reduce the dataset with PCA
-data_gan_reduced_PCA = PCA(n_components=2).fit_transform(data_gan_reduced)
-
-# Reduce the dataset with t-SNE
-data_gan_reduced_TSNE = TSNE(n_components=2).fit_transform(data_gan_reduced)
-
-# Save data
-# PCA csv
+# Save the data
 np.savetxt(fname=get_path(
-    f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/data_reduced_PCA_{EPOCH:05d}.csv"), 
-    X = data_gan_reduced_PCA, 
+    f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/data_reduced_gan_{EPOCH:05d}.csv"), 
+    X = data_gan_reduced, 
     delimiter=",")
-# t-SNE csv
-np.savetxt(fname=get_path(
-    f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/data_reduced_TSNE_{EPOCH:05d}.csv"), 
-    X = data_gan_reduced_TSNE, 
-    delimiter=",")
+
+# # Reduce the dataset with PCA
+# data_gan_reduced_PCA = PCA(n_components=2).fit_transform(data_gan_reduced)
+
+# # Reduce the dataset with t-SNE
+# data_gan_reduced_TSNE = TSNE(n_components=2).fit_transform(data_gan_reduced)
+
+# # Save data
+# # PCA csv
+# np.savetxt(fname=get_path(
+#     f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/data_reduced_PCA_{EPOCH:05d}.csv"), 
+#     X = data_gan_reduced_PCA, 
+#     delimiter=",")
+# # t-SNE csv
+# np.savetxt(fname=get_path(
+#     f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/data_reduced_TSNE_{EPOCH:05d}.csv"), 
+#     X = data_gan_reduced_TSNE, 
+#     delimiter=",")
