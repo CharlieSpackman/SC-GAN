@@ -1,6 +1,7 @@
 DataPreprocessing/GSE114727/
 DataPreprocessing/cache/
 models/
+ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
 .vscode/
 **/*.csv
 **/*.h5ad

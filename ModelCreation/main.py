@@ -1,20 +1,15 @@
 # Main.py
 
 # Import modules
-from TFGAN import SCGAN
-import numpy as np
-import pandas as pd
-from pathlib import Path
+from TFGAN import SCGAN, get_data
 
 # Read in the data
-data = pd.read_csv(Path("../data.csv"), delimiter = ",")
-data = data.iloc[:, 1:].to_numpy()
-print("[INFO] Data successfully loaded")
+data, _, _ = get_data("../DataPreprocessing/GSE114727")
 
 # Create GAN Class
 gan = SCGAN(
     data = data,
-    CHECKPOINT_PATH = Path("../models"), 
+    CHECKPOINT_PATH = "../models", 
     LRATE = 0.001, 
     EPOCHS = 20, 
     BATCH_SIZE = 256, 

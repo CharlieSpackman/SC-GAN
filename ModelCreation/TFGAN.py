@@ -9,18 +9,34 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+from umap import UMAP
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import time
 from datetime import datetime
 from scipy.spatial.distance import directed_hausdorff
-import os
 from pathlib import Path
 
 # Define a helper function for handling paths
 def get_path(path):
 
     return str(Path(path).resolve())
+
+# Define a helper function to read and split the data
+def get_data(folder_path):
+
+    # Read data
+    data = pd.read_csv(get_path(folder_path + "/GSE114727_processed_data.csv"), delimiter=",")
+    anno = pd.read_csv(get_path(folder_path + "/GSE114727_processed_annotations.csv"), delimiter=",")
+
+    # Get cell ids
+    cells = data.iloc[:, 0]
+    data = data.iloc[:, 1:].to_numpy()
+    
+    print("[INFO] Data successfully loaded")
+
+    return data, cells, anno
 
 ### Define Class container for training procedure ###
 class SCGAN():
@@ -333,9 +349,17 @@ Test set size = {self.test_data_n}
         test_set_reduced_TSNE = validation_set_reduced_TSNE[validation_labels==1]
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = hausdorff_dist(test_set_reduced_TSNE, generated_samples_reduced_TSNE)
+
+        # Reduce the dataset with UMAP
+        validation_set_reduced_UMAP = UMAP(n_components=2).fit_transform(validation_set)
+        generated_samples_reduced_UMAP = validation_set_reduced_UMAP[validation_labels==0]
+        test_set_reduced_UMAP = validation_set_reduced_UMAP[validation_labels==1]
+        # Calculate the correlation between samples
+        hausdorff_dist_UMAP = hausdorff_dist(test_set_reduced_UMAP, generated_samples_reduced_UMAP)
+        
         
         # Visualise the validation set
-        fig, axs = plt.subplots(1, 2)
+        fig, axs = plt.subplots(1, 3, figsize=(11.69, 8.27))
         fig.suptitle(f"Generator Validation at epoch {epoch}")
 
         # PCA plot
@@ -351,7 +375,14 @@ Test set size = {self.test_data_n}
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
+
+        # UMAP plot
+        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], label = "Generated", c = "red")
+        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], label = "Real", c = "blue")
+        axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
+        axs[2].set_xlabel("UMAP 1")
+        axs[2].set_ylabel("UMAP 2")
         
-        fig.legend(loc = "lower center", ncol = 2)
+        fig.legend(loc = "lower center", ncol = 3)
         fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/epoch_{epoch}_validation_plot.png"))
         plt.clf()

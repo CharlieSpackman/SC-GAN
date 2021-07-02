@@ -158,10 +158,12 @@ sc.pl.umap(integrated_adata, color='Celltype (major-lineage)')
 export_data_values = pd.DataFrame(integrated_adata.X, index = integrated_adata.obs.index, columns = integrated_adata.var.index)
 export_data_anno = pd.DataFrame(integrated_adata.obs.values, index = integrated_adata.obs.index, columns = integrated_adata.obs.columns.values)
 export_data_anno = export_data_anno.iloc[:,:-3]
-export_data = pd.concat([export_data_values, export_data_anno], axis = 1)
 
 # Save count matrix
-export_data.to_csv("sc_integrated_data.csv")
+export_data_values.to_csv("GSE114727\\GSE114727_processed_data.csv")
+
+# Save annotations
+export_data_anno.to_csv("GSE114727\\GSE114727_processed_annotations.csv")
 
 # Write results
 integrated_adata.write(results_file)
