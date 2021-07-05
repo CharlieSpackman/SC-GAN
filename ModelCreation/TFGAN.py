@@ -2,21 +2,35 @@
 
 # Import modules
 import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(40)
+tf.compat.v1.logging.set_verbosity('ERROR')
 from tensorflow.keras.models import Sequential 
-from tensorflow.keras.layers import LeakyReLU, Activation, Dense
+from tensorflow.keras.layers import LeakyReLU, Activation, Dense, BatchNormalization, Dropout
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
+import numpy as np
 import time
-from datetime import datetime
 from scipy.spatial.distance import directed_hausdorff
 from pathlib import Path
+
+# Set matplotlib settings
+plt.style.use('ggplot')
+SMALL_SIZE = 12
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 16
+plt.rc('font', size=SMALL_SIZE)        
+plt.rc('axes', titlesize=MEDIUM_SIZE)   
+plt.rc('axes', labelsize=MEDIUM_SIZE)  
+plt.rc('xtick', labelsize=SMALL_SIZE)  
+plt.rc('ytick', labelsize=SMALL_SIZE)  
+plt.rc('legend', fontsize=MEDIUM_SIZE)  
+plt.rc('figure', titlesize=BIGGER_SIZE)
+red = "#d1495b"
+blue = "#00798c"
 
 # Define a helper function for handling paths
 def get_path(path):
@@ -27,8 +41,8 @@ def get_path(path):
 def get_data(folder_path):
 
     # Read data
-    data = pd.read_csv(get_path(folder_path + "/GSE114727_processed_data.csv"), delimiter=",")
-    anno = pd.read_csv(get_path(folder_path + "/GSE114727_processed_annotations.csv"), delimiter=",")
+    data = pd.read_csv(get_path(folder_path + "GSE114727_processed_data.csv"), delimiter=",")
+    anno = pd.read_csv(get_path(folder_path + "GSE114727_processed_annotations.csv"), delimiter=",")
 
     # Get cell ids
     cells = data.iloc[:, 0]
@@ -44,7 +58,8 @@ class SCGAN():
     def __init__(self, 
         data, 
         CHECKPOINT_PATH = get_path("../models"), 
-        LRATE = 0.001, 
+        GEN_LRATE = 0.001,
+        DISC_LRATE = 0.001, 
         EPOCHS = 10000, 
         BATCH_SIZE = 50, 
         NOISE_DIM = 100, 
@@ -53,7 +68,8 @@ class SCGAN():
         self.data = data
 
         ### Define model parameters ###
-        self.LRATE = LRATE
+        self.GEN_LRATE = GEN_LRATE
+        self.DISC_LRATE = DISC_LRATE
         self.EPOCHS = EPOCHS
         self.BATCH_SIZE = BATCH_SIZE
         self.NOISE_DIM = NOISE_DIM
@@ -62,16 +78,16 @@ class SCGAN():
         self.CHECKPOINT_PATH = CHECKPOINT_PATH
         self.VAL_LOSS = []
         self.FILE_NAME = "{}_{}_{}_{}_{}_{}".format(
-            datetime.today().strftime('%Y-%m-%d'),
-            self.LRATE,
+            self.GEN_LRATE,
+            self.DISC_LRATE,
             self.EPOCHS,
             self.BATCH_SIZE,
             self.NOISE_DIM,
             self.SEED)
 
         ### Define Optimizers ###
-        self.gen_optimizer = Adam(self.LRATE)
-        self.disc_optimizer = Adam(self.LRATE)
+        self.gen_optimizer = Adam(self.GEN_LRATE)
+        self.disc_optimizer = Adam(self.DISC_LRATE)
 
         ### Define the loss functions ###
         self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=False)
@@ -107,6 +123,7 @@ class SCGAN():
             p.mkdir()
             p.joinpath("images").mkdir()
             p.joinpath("data").mkdir()
+            p.joinpath("metrics").mkdir()
 
 
     ### Define Network Architecture ###
@@ -118,14 +135,17 @@ class SCGAN():
         # Layer 1
         model.add(Dense(input_dim=self.NOISE_DIM, units=250))
         model.add(Activation("relu"))
+        model.add(BatchNormalization())
 
         # Layer 2
         model.add(Dense(units=500))
         model.add(Activation("relu"))
+        model.add(BatchNormalization())
 
         # Layer 3
         model.add(Dense(units=750))
         model.add(Activation("relu"))
+        model.add(BatchNormalization())
 
         # Output Layer
         model.add(Dense(units=self.NUM_FEATURES))
@@ -134,21 +154,26 @@ class SCGAN():
         return model
 
     # Discriminator network
-    def build_discriminator(self, alpha=0.2):
+    def build_discriminator(self, alpha=0.2, rate = 0.3):
         
         model = Sequential(name="Discriminator")
 
         # Layer 1
         model.add(Dense(input_dim=self.NUM_FEATURES, units = 500))
         model.add(LeakyReLU(alpha=alpha))
+        model.add(BatchNormalization())
 
         # Layer 2
+        model.add(Dropout(rate = rate))
         model.add(Dense(units = 200))
         model.add(LeakyReLU(alpha=alpha))
+        model.add(BatchNormalization())
 
         # Layer 3
+        model.add(Dropout(rate = rate))
         model.add(Dense(units = 100))
         model.add(LeakyReLU(alpha=alpha))
+        model.add(BatchNormalization())
 
         # sigmoid layer outputting a single value
         model.add(Dense(1))
@@ -179,7 +204,8 @@ class SCGAN():
     def get_learning_parameters(self):
 
         parameters = f"""---Learning Parameters---
-Learning rate = {self.LRATE}
+Generator Learning rate = {self.GEN_LRATE}
+Discriminator Learning rate = {self.DISC_LRATE}
 Epochs = {self.EPOCHS}
 Batch size = {self.BATCH_SIZE}
 Noise size = {self.NOISE_DIM}
@@ -271,15 +297,15 @@ Test set size = {self.test_data_n}
 
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
-            # Save the model every 50 epochs
-            if (epoch + 1) % 5 == 0:
+            # Save the model every 50 epochs - DON'T FORGET TO UPDATE THESE
+            if (epoch + 1) % 50 == 0:
                 self.create_checkpoint(epoch)
 
-            # Evaluate the model every 2000 epochs
-            if (epoch + 1) % 20 == 0:
+            # Evaluate the model every 2000 epochs - DON'T FORGET TO UPDATE THESE
+            if (epoch + 1) % 2000 == 0:
                 self.evaluate_model(epoch)
 
-        
+            
         print("[INFO] training completed in {} seconds!".format(round(time.time()-start, 2)))
         
         return None
@@ -301,7 +327,7 @@ Test set size = {self.test_data_n}
         plt.title('Validation Loss vs. Epochs')
         plt.ylabel('Validation Loss')
         plt.xlabel('Epoch')
-        plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right')
+        plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right', frameon = False)
         plt.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/losses_plot.png"))
         plt.clf()
 
@@ -359,30 +385,34 @@ Test set size = {self.test_data_n}
         
         
         # Visualise the validation set
-        fig, axs = plt.subplots(1, 3, figsize=(11.69, 8.27))
-        fig.suptitle(f"Generator Validation at epoch {epoch}")
+        axis_size = 8.0
+        plot_ratios = {'height_ratios': [1], 'width_ratios': [1,1,1]}
+        fig, axs = plt.subplots(1, 3, figsize=(axis_size*3, axis_size), gridspec_kw=plot_ratios, squeeze=True)
+        fig.suptitle(f"Generator Validation at epoch {epoch+1}")
 
         # PCA plot
-        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], label = "Generated", c = "red")
-        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], label = "Real", c = "blue")
+        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], c = red, s = 10)
+        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], c = blue, s = 10)
         axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
         axs[0].set_xlabel("PC1")
         axs[0].set_ylabel("PC2")
 
         # t-SNE plot
-        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = "red")
-        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = "blue")
+        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = red, s = 10)
+        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = blue, s = 10)
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
 
         # UMAP plot
-        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], label = "Generated", c = "red")
-        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], label = "Real", c = "blue")
+        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], c = red, s = 10)
+        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], c = blue, s = 10)
         axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
         axs[2].set_xlabel("UMAP 1")
         axs[2].set_ylabel("UMAP 2")
         
-        fig.legend(loc = "lower center", ncol = 3)
+        fig.legend(loc = "lower center", ncol = 2, frameon = False)
         fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/epoch_{epoch}_validation_plot.png"))
         plt.clf()
+
+        return None

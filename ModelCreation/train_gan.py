@@ -4,14 +4,15 @@
 from TFGAN import SCGAN, get_data
 
 # Read in the data
-data, _, _ = get_data("../DataPreprocessing/GSE114727")
+data, _, _ = get_data("../DataPreprocessing/GSE114727/")#
 
 # Create GAN Class
 gan = SCGAN(
     data = data,
     CHECKPOINT_PATH = "../models", 
-    LRATE = 0.001, 
-    EPOCHS = 20, 
+    GEN_LRATE = 0.001,
+    DISC_LRATE = 0.001, 
+    EPOCHS = 10000, 
     BATCH_SIZE = 256, 
     NOISE_DIM = 100, 
     SEED = 36)

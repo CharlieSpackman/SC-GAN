@@ -16,6 +16,7 @@ results_file = 'results.h5ad'
 FILE_PATH = "GSE114727/"
 
 ### Reading in data ###
+print("[INFO] Reading data")
 
 # Read in data into a AnnData objects
 adata_09_1 = sc.read_10x_mtx(
@@ -42,6 +43,9 @@ adata_11_2 = sc.read_10x_mtx(
     FILE_PATH + 'GSM3148579_BC11_TUMOR2',
     prefix= "GSM3148579_BC11_TUMOR2_",
     cache=True)
+
+print("[INFO] Data successfully read")
+
 
 # Print summaries for all datasets
 dataset_names = ["GSM3148575_BC09_TUMOR1", "GSM3148576_BC09_TUMOR2", "GSM3148577_BC10_TUMOR1", "GSM3148578_BC11_TUMOR1", "GSM3148579_BC11_TUMOR2"]
@@ -70,6 +74,7 @@ integrated_adata = adata_09_1.concatenate(
     index_unique = "|")
 
 ### Read in metadata ###
+print("[INFO] Reading metadata")
 
 # Define a helper function to remap the cell ID in the metadata file
 def split_id(id):
@@ -105,6 +110,8 @@ metadata.reindex(integrated_adata_index)
 integrated_adata.obs = metadata
 
 ### Data processing ###
+print("[INFO] Commencing data pre-processing")
+
 
 # Basic filtering
 sc.pp.filter_cells(integrated_adata, min_genes=200)
@@ -138,6 +145,7 @@ integrated_adata = integrated_adata[:, integrated_adata.var.highly_variable]
 sc.pp.scale(integrated_adata, max_value=10)
 
 ### Checking data quality ###
+print("[INFO] Checking data quality")
 
 # Perform PCA
 sc.tl.pca(integrated_adata, svd_solver='arpack')
@@ -154,10 +162,18 @@ sc.pl.umap(integrated_adata)
 # Layer the cell labels on the umap
 sc.pl.umap(integrated_adata, color='Celltype (major-lineage)')
 
+print("[INFO] Exporting processed data")
+
 # Export data for model creation and evaluation
 export_data_values = pd.DataFrame(integrated_adata.X, index = integrated_adata.obs.index, columns = integrated_adata.var.index)
 export_data_anno = pd.DataFrame(integrated_adata.obs.values, index = integrated_adata.obs.index, columns = integrated_adata.obs.columns.values)
 export_data_anno = export_data_anno.iloc[:,:-3]
+
+
+### Generate a sample ###
+sample_n = 1000
+export_data_values = export_data_values.sample(sample_n)
+export_data_anno = export_data_anno.loc[export_data_values.index,:]
 
 # Save count matrix
 export_data_values.to_csv("GSE114727\\GSE114727_processed_data.csv")

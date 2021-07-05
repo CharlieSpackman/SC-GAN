@@ -1,101 +1,125 @@
 # evaluate_scPred.R
 
-# Set working directory
-setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
-data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/sc_integrated_data.csv"
-
 # Load the required libraries
 library("scPred")
 library("Seurat")
 library("magrittr")
 library("tidyverse")
-library("data.table")
+library(data.table)
 require(caTools)
 set.seed(30) 
 
+# Set working directory
+setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
+
+# Get file path for the GAN reduced data
+MODEL = "0.001_0.001_10000_256_100_36" # UPDATE AS REQUIRED
+EPOCH = "00250" # UPDATE AS REQUIRED
+gan_data_path = paste(
+    "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
+    MODEL,
+    "/data/data_reduced_gan_",
+    EPOCH,
+    ".csv",
+    sep = "")
+
+# Get file paths for the baseline data
+baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114727/GSE114727_processed_data.csv"
+
+# Get the annotations
+anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114727/GSE114727_processed_annotations.csv"
+
 # Define a function to create the Seurat object
-create_Seurat <- function(data, anno_names, target_name=NA, train=FALSE) {
-  
-  # Split out cell labels
-  anno <- data[, anno_names]
-  data <- data[, ! colnames(data) %in% anno_names]
+scPred <- function(data, anno) {
   
   # transpose the data
   data_t <- transpose(data)
-  
+
   # get row and colnames in order
   colnames(data_t) <- rownames(data)
   rownames(data_t) <- colnames(data)
   
-  # Create Seurat object
-  data_S <- CreateSeuratObject(counts = data_t, meta.data = anno)
+  # Split the data into training and testing datasets
+  smp_size <- floor(0.75 * ncol(data_t))
+  train_ind <- sample(seq_len(ncol(data_t)), size = smp_size)
+                      
+  train_data = data_t[, train_ind]
+  test_data  = data_t[, -train_ind]
   
-  # Preprocess the data
-  data_S <- FindVariableFeatures(object = data_S)
-  data_S <- ScaleData(object = data_S, assay="RNA")
+  # Split the labels into training and testing datasets
+  train_y = anno[train_ind, ]
+  test_y  = anno[-train_ind, ]
   
-  data_S <- RunPCA(data_S, features = VariableFeatures(object = data_S))
-  data_S <- RunUMAP(data_S, dims = 1:30)
+  # Create Seurat objects
+  train_data_S <- CreateSeuratObject(counts = train_data, meta.data = train_y)
+  test_data_S <- CreateSeuratObject(counts = test_data, meta.data = test_y)
   
-  if(train==TRUE){
+  # Pre-process the data
+  train_data_S <- FindVariableFeatures(object = train_data_S)
+  train_data_S <- ScaleData(object = train_data_S, assay="RNA")
+  train_data_S <- RunPCA(train_data_S, features = VariableFeatures(object = train_data_S))
+  train_data_S <- RunUMAP(train_data_S, dims = 1:30)
   
-    # Get Feature Space
-    data_S <- getFeatureSpace(data_S, target_name)
-    
-    # Train the classifier
-    data_S <- trainModel(data_S)
-
-  }
+  # Get Feature Space
+  train_data_S <- getFeatureSpace(train_data_S, "Celltype..major.lineage.")
   
-  return(data_S)
+  # Train the classifier
+  train_data_S <- trainModel(train_data_S)
+  
+  # Get predictions
+  test_data_S <- scPredict(test_data_S, train_data_S, threshold = 0.0)
+  predictions <- test_data_S@meta.data$scpred_prediction
+  
+  # Get labels
+  labels <- test_data_S@meta.data$Celltype..major.lineage.
+  
+  # Create dataframe
+  output <- data.frame(predictions, labels)
+  
+  return(output)
   
 }
-  
 
-# Read in data
-data <- read.csv(data_path)
+# Read in labels
+anno <- read.csv(anno_path)
 
-anno_names = c("X", 
-               "Sample",
-               "Celltype..major.lineage.",
-               "Celltype..minor.lineage.",
-               "Age",
-               "Gender")
+### GAN evaluation ### 
+# Read in GAN reduced data
+gan_reduced_data <- read.csv(gan_data_path)
+gan_reduced_data <- gan_reduced_data[, 2:ncol(gan_reduced_data)]
 
+# Get predictions for GAN reduced data
+gan_predictions = scPred(gan_reduced_data, anno)
 
-# Split the data into training and testing datasets
-sample = sample.split(data$X, SplitRatio = .80)
-train_data = subset(data, sample == TRUE)
-test_data  = subset(data, sample == FALSE)
+# File path
+gan_path = paste(
+  "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
+  MODEL,
+  "/metrics/scPred_reduced_gan_predictions_",
+  EPOCH,
+  ".csv",
+  sep = "")
 
-# Create Seurat objects for both
-train_data_S = create_Seurat(data = train_data, 
-                             anno_names = anno_names, 
-                             target_name = "Celltype..major.lineage.",
-                             train = TRUE)
-
-test_data_S = create_Seurat(data = test_data, 
-                             anno_names = anno_names, 
-                             target_name = "Celltype..major.lineage.",
-                             train = FALSE)
+# Save the predictions as a csv file
+write.csv(gan_predictions, gan_path, row.names = FALSE)
 
 
-# Get predictions for samples in the validation set
-test_data_S <- scPredict(test_data_S, train_data_S)
+### Baseline evaluation ### 
+# Read in GAN reduced data
+baseline_data <- read.csv(baseline_data_path)
+baseline_data <- baseline_data[, 2:ncol(baseline_data)]
 
-# Evaluate the performance of the classifier on the test set
+# Get predictions for GAN reduced data
+baseline_predictions = scPred(baseline_data, anno)
 
-# Get predictions
-predictions = test_data_S@meta.data$scpred_prediction
+# File path
+baseline_path = paste(
+  "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
+  MODEL,
+  "/metrics/scPred_baseline_predictions_",
+  EPOCH,
+  ".csv",
+  sep = "")
 
-# Get actual labels
-labels = test_data_S@meta.data$Celltype..major.lineage.
-
-# Performance metrics
-accuracy = mean(predictions == labels)
-error = 1 - accuracy
-results = table(predictions,labels)
-
-# Print results
-print(paste("Accuracy:", accuracy))
-print(results)
+# Save the predictions as a csv file
+write.csv(baseline_predictions, baseline_path, row.names = FALSE)

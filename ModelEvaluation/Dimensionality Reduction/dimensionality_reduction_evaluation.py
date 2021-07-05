@@ -1,10 +1,18 @@
 # dimensionality_reduction_evaluation.py
 
+# import environment modules
+from pathlib import Path
+import sys
+
+from tensorflow.python.ops.gen_array_ops import size
+sys.path.append(str(Path("../../ModelCreation/").resolve()))
+sys.path.append(str(Path("pyDRMetrics/").resolve()))
+
 # Import the GAN class
-from ...ModelCreation.TFGAN import *
+from TFGAN import SCGAN, get_path, get_data
 
 # Import pyDRMetrics class
-from .pyDRMetrics.pyDRMetrics import *
+from pyDRMetrics.pyDRMetrics import *
 
 # import standard modules
 import tensorflow as tf
@@ -18,22 +26,38 @@ from umap import UMAP
 from pathlib import Path
 import sys
 
+# Set matplotlib settings
+plt.style.use('ggplot')
+SMALL_SIZE = 12
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 16
+plt.rc('font', size=SMALL_SIZE)        
+plt.rc('axes', titlesize=MEDIUM_SIZE)   
+plt.rc('axes', labelsize=MEDIUM_SIZE)  
+plt.rc('xtick', labelsize=SMALL_SIZE)  
+plt.rc('ytick', labelsize=SMALL_SIZE)  
+plt.rc('legend', fontsize=MEDIUM_SIZE)  
+plt.rc('figure', titlesize=BIGGER_SIZE)
+red = "#d1495b"
+blue = "#00798c"
+
 # Update path to model for evaluation
 CHECKPOINT_PATH = get_path("../../models")
-MODEL_NAME = "2021-06-28_0.001_20_256_100_36" ### Update this as required
-EPOCH = 20 ### Update this as required
+MODEL_NAME = "0.001_0.001_10000_256_100_36" ### Update this as required
+EPOCH = 250 ### Update this as required
 
 model_path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/epochs/{EPOCH:05d}")
 latest_model = tf.train.latest_checkpoint(get_path(f"{model_path}/ckpt"))
 
 # Define parameters
 SEED = 36
-VAL_SIZE = 500
+VAL_SIZE = 20
 
 
 ### Get data ###
 # Read in data
-data, _, _ = get_data("../../DataPreprocessing/GSE114727")
+data, _, _ = get_data("../../DataPreprocessing/GSE114727/")
+data = data[:100,:100]
 
 # Create a validations set
 _, validation_data = train_test_split(data, test_size=(VAL_SIZE/data.shape[0]), random_state=SEED)
@@ -55,16 +79,17 @@ if Path(model_path).exists:
     checkpoint.restore(latest_model)
 
 else:
-    print(f"No model found in {model_path}")
+    print(f"[ERROR] No model found in {model_path}")
     sys.exit()
 
 
 ### Reduce the data using tha GAN ###
 # Create a model which outputs the Discriminator hidden layer
 discriminator_hidden = tf.keras.Model(discriminator.input, discriminator.layers[2].output)
+print("[INFO] Model created")
 
 # Reduce the dimensionality of the data using the Discriminator
-validation_data_gan_reduced = discriminator_hidden(validation_data)
+validation_data_gan_reduced = discriminator_hidden(validation_data).numpy()
 
 ### Perform further dimensionality reduction ###
 # Define a function to return a reduced dataset and the reconstruction error
@@ -78,18 +103,16 @@ def reduce_data(data, method):
 
         drm = DRMetrics(data, reduced_data, r_error)
 
-        return reduced_data, r_error, drm
+        return (reduced_data, r_error, drm)
 
 
     elif method == "TSNE":
 
         tsne = TSNE(n_components=2).fit(data)
-        reduced_data = tsne.transform(data)
-        r_error = tsne.inverse_transform(reduced_data)
+        reduced_data = tsne.embedding_
+        drm = DRMetrics(data, reduced_data, None)
 
-        drm = DRMetrics(data, reduced_data, r_error)
-
-        return reduced_data, r_error, drm
+        return (reduced_data, drm)
 
     elif method == "UMAP":
 
@@ -99,31 +122,61 @@ def reduce_data(data, method):
 
         drm = DRMetrics(data, reduced_data, r_error)
 
-        return reduced_data, r_error, drm
+        return (reduced_data, r_error, drm)
+
+    return None
 
     
 # Reduce the dataset with PCA
-validation_data_reduced_PCA, validation_data_reduced_PCA_error, validation_data_reduced_PCA_drm = reduce_data(validation_data, "PCA")
-validation_data_gan_reduced_PCA, validation_data_gan_reduced_PCA_error, validation_data_gan_reduced_PCA_drm = reduce_data(validation_data_gan_reduced, "PCA")
+pca = reduce_data(validation_data, "PCA")
+validation_data_reduced_PCA = pca[0]
+validation_data_reduced_PCA_error = pca[1]
+validation_data_reduced_PCA_drm = pca[2]
+
+pca_gan = reduce_data(validation_data_gan_reduced, "PCA")
+validation_data_gan_reduced_PCA = pca_gan[0]
+validation_data_gan_reduced_PCA_error = pca_gan[1]
+validation_data_gan_reduced_PCA_drm = pca_gan[2]
+print("[INFO] PCA complete")
 
 # Reduce the dataset with t-SNE
-validation_data_reduced_TSNE, validation_data_reduced_TSNE_error, validation_data_reduced_TSNE_drm = reduce_data(validation_data, "TSNE")
-validation_data_gan_reduced_TSNE, validation_data_gan_reduced_TSNE_error, validation_data_gan_reduced_TSNE_drm = reduce_data(validation_data_gan_reduced, "TSNE")
+tsne = reduce_data(validation_data, "TSNE")
+validation_data_reduced_TSNE = tsne[0]
+validation_data_reduced_TSNE_drm = tsne[1]
+
+tsne_gan = reduce_data(validation_data_gan_reduced, "TSNE")
+validation_data_gan_reduced_TSNE = tsne_gan[0]
+validation_data_gan_reduced_TSNE_drm = tsne_gan[1]
+print("[INFO] t-SNE complete")
 
 # Reduce the dataset with umap
-validation_data_reduced_UMAP, validation_data_reduced_UMAP_error, validation_data_reduced_UMAP_drm = reduce_data(validation_data, "UMAP")
-validation_data_gan_reduced_UMAP, validation_data_gan_reduced_UMAP_error, validation_data_gan_reduced_UMAP_drm = reduce_data(validation_data_gan_reduced, "UMAP")
+umap = reduce_data(validation_data, "UMAP")
+validation_data_reduced_UMAP = umap[0]
+validation_data_reduced_UMAP_error = umap[1]
+validation_data_reduced_UMAP_drm = umap[2]
+
+umap_gan = reduce_data(validation_data_gan_reduced, "UMAP")
+validation_data_gan_reduced_UMAP = umap_gan[0]
+validation_data_gan_reduced_UMAP_error = umap_gan[1]
+validation_data_gan_reduced_UMAP_drm = umap_gan[2]
+print("[INFO] UMAP complete")
+
+print("[INFO] Data has been reduced")
 
 
 ### Compute metrics ###
 # Define a function to extract metrics from a pyDRMetrics object
-def get_metrics(metrics):
+def get_metrics(metrics, method = None):
 
     metrics_list = []
 
     # Reconstruction error
-    metrics_list.append(metrics.mse)
-    metrics_list.append(metrics.rmse)
+    if method == "TSNE":
+        metrics_list.append(None)
+        metrics_list.append(None)
+    else:
+        metrics_list.append(metrics.mse)
+        metrics_list.append(metrics.rmse)
 
     # Residual variance
     metrics_list.append(metrics.Vr)
@@ -143,17 +196,19 @@ def get_metrics(metrics):
         "LCMC",
         "Q-Local",
         "Q-Global"]
+    
+    metrics_list = np.array(metrics_list).reshape(1, -1)
 
     # Create Pandas series
-    return pd.Series(data = metrics_list, index=metrics_labels)
+    return pd.DataFrame(data = metrics_list, columns=metrics_labels)
 
 # Compute metrics for PCA
 validation_data_reduced_PCA_metrics = get_metrics(validation_data_reduced_PCA_drm)
 validation_data_gan_reduced_PCA_metrics = get_metrics(validation_data_gan_reduced_PCA_drm)
 
 # Compute metrics for t-SNE
-validation_data_reduced_TSNE_metrics = get_metrics(validation_data_reduced_TSNE_drm)
-validation_data_gan_reduced_TSNE_metrics = get_metrics(validation_data_gan_reduced_TSNE_drm)
+validation_data_reduced_TSNE_metrics = get_metrics(validation_data_reduced_TSNE_drm, method = "TSNE")
+validation_data_gan_reduced_TSNE_metrics = get_metrics(validation_data_gan_reduced_TSNE_drm, method = "TSNE")
 
 # Compute metrics for umap
 validation_data_reduced_UMAP_metrics = get_metrics(validation_data_reduced_UMAP_drm)
@@ -161,10 +216,10 @@ validation_data_gan_reduced_UMAP_metrics = get_metrics(validation_data_gan_reduc
 
 
 ### Combine and export metrics ###
-col_names = [
+row_names = pd.Series([
     "PCA", "GAN+PCA",
     "TSNE", "GAN+TSNE",
-    "UMAP", "GAN+UMAP"]
+    "UMAP", "GAN+UMAP"], name = "Index")
 
 combined_metrics = pd.concat([
     validation_data_reduced_PCA_metrics,
@@ -173,52 +228,59 @@ combined_metrics = pd.concat([
     validation_data_gan_reduced_TSNE_metrics,
     validation_data_reduced_UMAP_metrics,
     validation_data_gan_reduced_UMAP_metrics],
-    axis = 1).rename(columns=col_names)
+    axis = 0).reset_index(drop = True)
+
+combined_metrics["Index"] = row_names
+combined_metrics = combined_metrics.set_index("Index").round(2)
 
 # Save dataframe as csv
-combined_metrics.to_csv(path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/dimensionality_reduction_metrics.csv"))
+combined_metrics.to_csv(get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/data/dimensionality_reduction_metrics_{EPOCH:05d}.csv"))
+print("[INFO] Evaluation metrics created")
 
 
 ### Plot the data ###
 # Plot the results for sample correlation
-fig, axs = plt.subplots(3, 2, figsize=(8.27, 11.69))
+axis_size = 8.0
+plot_ratios = {'height_ratios': [1,1,1], 'width_ratios': [1,1]}
+fig, axs = plt.subplots(3, 2, figsize=(axis_size*3, axis_size*3), gridspec_kw=plot_ratios, squeeze=True)
 
 # PCA plot
-axs[0,0].scatter(validation_data_reduced_PCA[:,0], validation_data_reduced_PCA[:,1], label = "PCA")
+axs[0,0].scatter(validation_data_reduced_PCA[:,0], validation_data_reduced_PCA[:,1], label = "PCA", c = red)
 axs[0,0].title.set_text(f"PCA")
 axs[0,0].set_xlabel("PC1")
 axs[0,0].set_ylabel("PC2")
 
 # GAN + PCA plot
-axs[0,1].scatter(validation_data_gan_reduced_PCA[:,0], validation_data_gan_reduced_PCA[:,1], label = "GAN + PCA")
+axs[0,1].scatter(validation_data_gan_reduced_PCA[:,0], validation_data_gan_reduced_PCA[:,1], label = "GAN + PCA", c = blue)
 axs[0,1].title.set_text(f"GAN + PCA")
 axs[0,1].set_xlabel("PC1")
 axs[0,1].set_ylabel("PC2")
 
 # t-SNE plot
-axs[1,0].scatter(validation_data_reduced_TSNE[:,0], validation_data_reduced_TSNE[:,1], label = "TSNE")
+axs[1,0].scatter(validation_data_reduced_TSNE[:,0], validation_data_reduced_TSNE[:,1], label = "TSNE", c = red)
 axs[1,0].title.set_text(f"t-SNE")
 axs[1,0].set_xlabel("TSNE 1")
 axs[1,0].set_ylabel("TSNE 2")
 
 # GAN + t-SNE plot
-axs[1,1].scatter(validation_data_gan_reduced_TSNE[:,0], validation_data_gan_reduced_TSNE[:,1], label = "GAN + TSNE")
+axs[1,1].scatter(validation_data_gan_reduced_TSNE[:,0], validation_data_gan_reduced_TSNE[:,1], label = "GAN + TSNE", c = blue)
 axs[1,1].title.set_text(f"GAN + t-SNE")
 axs[1,1].set_xlabel("TSNE 1")
 axs[1,1].set_ylabel("TSNE 2")
 
 # UMAP plot
-axs[2,0].scatter(validation_data_reduced_UMAP[:,0], validation_data_reduced_UMAP[:,1], label = "UMAP")
+axs[2,0].scatter(validation_data_reduced_UMAP[:,0], validation_data_reduced_UMAP[:,1], label = "UMAP", c = red)
 axs[2,0].title.set_text(f"UMAP")
 axs[2,0].set_xlabel("UMAP 1")
 axs[2,0].set_ylabel("UMAP 2")
 
 # GAN + UMAP plot
-axs[2,1].scatter(validation_data_gan_reduced_UMAP[:,0], validation_data_gan_reduced_UMAP[:,1], label = "GAN + UMAP")
+axs[2,1].scatter(validation_data_gan_reduced_UMAP[:,0], validation_data_gan_reduced_UMAP[:,1], label = "GAN + UMAP", c = blue)
 axs[2,1].title.set_text(f"GAN + UMAP")
 axs[2,1].set_xlabel("UMAP 1")
 axs[2,1].set_ylabel("UMAP 2")
 
 
-fig.savefig(fname=get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/images/dimensionality_reduction_plot.png"))
+fig.savefig(fname=get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/images/dimensionality_reduction_plot_{EPOCH:05d}.png"))
 plt.clf() 
+print("[INFO] Evaluation plot saved")
