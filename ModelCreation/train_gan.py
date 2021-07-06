@@ -12,10 +12,10 @@ gan = SCGAN(
     CHECKPOINT_PATH = "../models", 
     GEN_LRATE = 0.001,
     DISC_LRATE = 0.001, 
-    EPOCHS = 10000, 
-    BATCH_SIZE = 256, 
+    EPOCHS = 100, 
+    BATCH_SIZE = 250, 
     NOISE_DIM = 100, 
-    SEED = 36)
+    SEED = 30)
 
 # Print model summaries
 gan.get_model_summaries()

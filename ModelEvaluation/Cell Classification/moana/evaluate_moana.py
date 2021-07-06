@@ -8,8 +8,8 @@ from sklearn.decomposition import PCA
 from sklearn.svm import NuSVC
 
 # Evaluation parameters
-MODEL_NAME = "0.001_0.001_10000_256_100_36" # UPDATE AS NEEDED
-EPOCH = 250 # UPDATE AS NEEDED
+MODEL_NAME = "0.001_0.001_100_250_100_30" # UPDATE AS NEEDED
+EPOCH = 100 # UPDATE AS NEEDED
 
 # Paths for reduced data
 MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models\\"
@@ -21,6 +21,7 @@ ANNO_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Proj
 SEED = 30
 
 # Read in the annotations
+print("[INFO] Reading data")
 anno = pd.read_csv(ANNO_PATH, delimiter=',', index_col = 0)
 labels = anno["Celltype (major-lineage)"].reset_index(drop=True).rename("labels")
 
@@ -49,13 +50,12 @@ def moana(data, labels):
 
     # Evaluate performance using the test set
     predictions = pd.Series(svm_model.predict(test_data), name = "predictions", index=None)
-    print(test_y.reset_index(drop=True))
 
     output = pd.concat([predictions, test_y.reset_index(drop=True)], axis = 1)
 
     return output
 
-
+print("[INFO] Evaluating predictions")
 ### Get prdictions for GAN reduced data ###
 # Read in GAN reduced data
 gan_reduced_data = pd.read_csv(FILE_PATH, delimiter=',', index_col=0).astype(np.float64)
@@ -70,4 +70,6 @@ baseline_data = pd.read_csv(BASELINE_DATA_PATH, delimiter=',', index_col=0).asty
 # Apply Moana to the GAN reduced data
 baseline_predictions =  moana(baseline_data, labels)
 # Save the predictions as a csv
-baseline_predictions.to_csv(f"{MODEL_PATH}\\{MODEL_NAME}\\metrics\\moana_baseline_predictions_{EPOCH:05d}.csv")
+baseline_predictions.to_csv(f"{MODEL_PATH}\\{MODEL_NAME}\\metrics\\moana_baseline_predictions_{EPOCH:05d}.csv", index=False)
+
+print("[INFO] Evaluation complete")

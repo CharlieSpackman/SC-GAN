@@ -183,3 +183,5 @@ export_data_anno.to_csv("GSE114727\\GSE114727_processed_annotations.csv")
 
 # Write results
 integrated_adata.write(results_file)
+
+print("[INFO] Data successfully exported")

@@ -6,13 +6,14 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 
 # Evaluation parameters
-MODEL_NAME = "0.001_0.001_10000_256_100_36" # UPDATE AS NEEDED
-EPOCH = 250 # UPDATE AS NEEDED
+MODEL_NAME = "0.001_0.001_100_250_100_30" # UPDATE AS NEEDED
+EPOCH = 100 # UPDATE AS NEEDED
 
 # Paths for reduced data
 MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models\\"
 METRICS_PATH = f"{MODEL_PATH}\\{MODEL_NAME}\\metrics\\"
 
+print("[INFO] Reading data")
 # Read in predictions and labels for moana
 moana_gan_reduced = pd.read_csv(METRICS_PATH + f"moana_reduced_gan_predictions_{EPOCH:05d}.csv")
 moana_baseline = pd.read_csv(METRICS_PATH + f"moana_baseline_predictions_{EPOCH:05d}.csv")
@@ -34,9 +35,13 @@ def compute_metrics(data, axes, ax_title):
     y_true = data["labels"]
     y_pred = data["predictions"]
 
-    n_samples = y_true.shape[0]
-    class_labels = y_true.unique()
-    m_classes = class_labels.shape[0]
+    class_labels = [
+        "CD4Tconv",
+        "CD8T",
+        "CD8Tex",
+        "Tprolif",
+        "Treg"
+    ]
 
     # Compute accuracy
     accuracy = metrics.accuracy_score(y_true, y_pred)
@@ -58,11 +63,12 @@ def compute_metrics(data, axes, ax_title):
     })
 
     # Get the confusion matrix plot
-    ax = metrics.ConfusionMatrixDisplay(cm, display_labels = class_labels).plot(ax=axes).ax_
+    ax = metrics.ConfusionMatrixDisplay(cm, display_labels = class_labels).plot(ax=axes, colorbar=False).ax_
     ax.set_title(ax_title)
 
     return metrics_arr, ax
 
+print("[INFO] Computing metrics")
 # Get the metrics and plots for the datasets
 moana_gan_reduced_metrics, moana_gan_reduced_plot = compute_metrics(moana_gan_reduced, axes[0,0], "Moana: GAN Reduced")
 moana_baseline_metrics, moana_baseline_plot = compute_metrics(moana_baseline, axes[0,1], "Moana: Baseline")
@@ -70,7 +76,7 @@ scPred_gan_reduced_metrics, scPred_gan_reduced_plot = compute_metrics(scPred_gan
 scPred_baseline_metrics, scPred_baseline_plot = compute_metrics(scPred_baseline, axes[1,1], "scPred: Baseline")
 
 # Save plot
-plt.savefig(f"{MODEL_PATH}\\{MODEL_NAME}\\images\\confusion_matrices.png")
+plt.savefig(f"{MODEL_PATH}\\{MODEL_NAME}\\images\\confusion_matrices_{EPOCH:05d}.png")
 
 # Create a dataframe with all metrics
 col_names = [
@@ -91,3 +97,5 @@ metrics_arr.columns = col_names
 
 # Save metrics as a csv
 metrics_arr.to_csv(METRICS_PATH + f"evaluation_metrics_{EPOCH:05d}.csv")
+
+print("[INFO] Metrics saved")

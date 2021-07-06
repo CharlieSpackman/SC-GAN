@@ -16,8 +16,8 @@ import sys
 
 # Update path to model for evaluation
 CHECKPOINT_PATH = get_path("../../models")
-MODEL_NAME = "0.001_0.001_10000_256_100_36" ### Update this as required
-EPOCH = 250 ### Update this as required
+MODEL_NAME = "0.001_0.001_100_250_100_30" ### Update this as required
+EPOCH = 100 ### Update this as required
 
 model_path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/epochs/{EPOCH:05d}")
 latest_model = tf.train.latest_checkpoint(get_path(f"{model_path}/ckpt"))

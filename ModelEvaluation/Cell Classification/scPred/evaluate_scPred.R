@@ -13,8 +13,8 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL = "0.001_0.001_10000_256_100_36" # UPDATE AS REQUIRED
-EPOCH = "00250" # UPDATE AS REQUIRED
+MODEL = "0.001_0.001_100_250_100_30" # UPDATE AS REQUIRED
+EPOCH = "00100" # UPDATE AS REQUIRED
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
     MODEL,

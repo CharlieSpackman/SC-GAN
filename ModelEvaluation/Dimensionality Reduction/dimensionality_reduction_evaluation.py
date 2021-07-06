@@ -43,21 +43,20 @@ blue = "#00798c"
 
 # Update path to model for evaluation
 CHECKPOINT_PATH = get_path("../../models")
-MODEL_NAME = "0.001_0.001_10000_256_100_36" ### Update this as required
-EPOCH = 250 ### Update this as required
+MODEL_NAME = "0.001_0.001_100_250_100_30" ### Update this as required
+EPOCH = 100 ### Update this as required
 
 model_path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/epochs/{EPOCH:05d}")
 latest_model = tf.train.latest_checkpoint(get_path(f"{model_path}/ckpt"))
 
 # Define parameters
 SEED = 36
-VAL_SIZE = 20
+VAL_SIZE = 200
 
 
 ### Get data ###
 # Read in data
 data, _, _ = get_data("../../DataPreprocessing/GSE114727/")
-data = data[:100,:100]
 
 # Create a validations set
 _, validation_data = train_test_split(data, test_size=(VAL_SIZE/data.shape[0]), random_state=SEED)

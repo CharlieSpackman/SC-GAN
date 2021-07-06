@@ -298,11 +298,11 @@ Test set size = {self.test_data_n}
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
             # Save the model every 50 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 20 == 0:
                 self.create_checkpoint(epoch)
 
             # Evaluate the model every 2000 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 2000 == 0:
+            if (epoch + 1) % 100 == 0:
                 self.evaluate_model(epoch)
 
             
@@ -314,11 +314,19 @@ Test set size = {self.test_data_n}
     def produce_loss_graph(self):
 
         # Convert list of lists into a numpy arrays
-        gen_losses = np.array([loss[0] for loss in self.VAL_LOSS]).reshape(-1,1)
-        disc_losses = np.array([loss[1] for loss in self.VAL_LOSS]).reshape(-1,1)
+        gen_losses = pd.Series([loss[0].numpy() for loss in self.VAL_LOSS])
+        disc_losses = pd.Series([loss[1].numpy() for loss in self.VAL_LOSS])
         model_losses = gen_losses + disc_losses
 
-        combined_losses = np.concatenate((gen_losses, disc_losses, model_losses), axis = 1)
+        # Combine losses in a dataframe
+        combined_losses = pd.DataFrame(
+            {"gen_loss": gen_losses,
+            "disc_loss": disc_losses,
+            "total_loss": model_losses}
+            )
+
+        # Save losses as csv
+        combined_losses.to_csv(get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/losses.csv"), index=False)
 
         # Create loss graph
         plt.plot(gen_losses)
@@ -332,7 +340,6 @@ Test set size = {self.test_data_n}
         plt.clf()
 
         # Save losses as csv
-        np.savetxt(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/losses.csv"), X = combined_losses, delimiter=",")
 
         return None
 
@@ -412,7 +419,7 @@ Test set size = {self.test_data_n}
         axs[2].set_ylabel("UMAP 2")
         
         fig.legend(loc = "lower center", ncol = 2, frameon = False)
-        fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/epoch_{epoch}_validation_plot.png"))
+        fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/training_validation_plot_{epoch+1:05d}.png"))
         plt.clf()
 
         return None
