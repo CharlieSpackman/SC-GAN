@@ -19,9 +19,9 @@ from pathlib import Path
 
 # Set matplotlib settings
 plt.style.use('ggplot')
-SMALL_SIZE = 12
-MEDIUM_SIZE = 14
-BIGGER_SIZE = 16
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
 plt.rc('font', size=SMALL_SIZE)        
 plt.rc('axes', titlesize=MEDIUM_SIZE)   
 plt.rc('axes', labelsize=MEDIUM_SIZE)  
@@ -31,6 +31,11 @@ plt.rc('legend', fontsize=MEDIUM_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
 red = "#d1495b"
 blue = "#00798c"
+point_size = 20
+legend_point_size = 40
+line_width = 1.5
+axis_size = 8
+
 
 # Define a helper function for handling paths
 def get_path(path):
@@ -58,8 +63,8 @@ class SCGAN():
     def __init__(self, 
         data, 
         CHECKPOINT_PATH = get_path("../models"), 
-        GEN_LRATE = 0.001,
-        DISC_LRATE = 0.001, 
+        GEN_LRATE = 0.0001,
+        DISC_LRATE = 0.0001, 
         EPOCHS = 10000, 
         BATCH_SIZE = 50, 
         NOISE_DIM = 100, 
@@ -128,24 +133,24 @@ class SCGAN():
 
     ### Define Network Architecture ###
     # Generator Network
-    def build_generator(self):
+    def build_generator(self, alpha = 0.2):
 
         model = Sequential(name="Generator")
 
         # Layer 1
-        model.add(Dense(input_dim=self.NOISE_DIM, units=250))
-        model.add(Activation("relu"))
+        model.add(Dense(input_dim=self.NOISE_DIM, units=500))
+        model.add(LeakyReLU(alpha=alpha))
         model.add(BatchNormalization())
 
-        # Layer 2
-        model.add(Dense(units=500))
-        model.add(Activation("relu"))
-        model.add(BatchNormalization())
+        # # Layer 2
+        # model.add(Dense(units=500))
+        # model.add(LeakyReLU(alpha=alpha))
+        # model.add(BatchNormalization())
 
-        # Layer 3
-        model.add(Dense(units=750))
-        model.add(Activation("relu"))
-        model.add(BatchNormalization())
+        # # Layer 3
+        # model.add(Dense(units=750))
+        # model.add(LeakyReLU(alpha=alpha))
+        # model.add(BatchNormalization())
 
         # Output Layer
         model.add(Dense(units=self.NUM_FEATURES))
@@ -159,25 +164,24 @@ class SCGAN():
         model = Sequential(name="Discriminator")
 
         # Layer 1
-        model.add(Dense(input_dim=self.NUM_FEATURES, units = 500))
+        model.add(Dense(input_dim=self.NUM_FEATURES, units = 200))
         model.add(LeakyReLU(alpha=alpha))
         model.add(BatchNormalization())
 
-        # Layer 2
-        model.add(Dropout(rate = rate))
-        model.add(Dense(units = 200))
-        model.add(LeakyReLU(alpha=alpha))
-        model.add(BatchNormalization())
+        # # Layer 2
+        # model.add(Dropout(rate = rate))
+        # model.add(Dense(units = 200))
+        # model.add(LeakyReLU(alpha=alpha))
+        # model.add(BatchNormalization())
 
         # Layer 3
-        model.add(Dropout(rate = rate))
-        model.add(Dense(units = 100))
-        model.add(LeakyReLU(alpha=alpha))
-        model.add(BatchNormalization())
+        # model.add(Dropout(rate = rate))
+        # model.add(Dense(units = 100))
+        # model.add(LeakyReLU(alpha=alpha))
+        # model.add(BatchNormalization())
 
         # sigmoid layer outputting a single value
         model.add(Dense(1))
-        model.add(Activation("sigmoid"))
         
         # return the discriminator model
         return model
@@ -298,11 +302,11 @@ Test set size = {self.test_data_n}
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
             # Save the model every 50 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 20 == 0:
+            if (epoch + 1) % 50 == 0:
                 self.create_checkpoint(epoch)
 
             # Evaluate the model every 2000 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 2000 == 0:
                 self.evaluate_model(epoch)
 
             
@@ -329,14 +333,18 @@ Test set size = {self.test_data_n}
         combined_losses.to_csv(get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/losses.csv"), index=False)
 
         # Create loss graph
-        plt.plot(gen_losses)
-        plt.plot(disc_losses)
-        plt.plot(model_losses)
-        plt.title('Validation Loss vs. Epochs')
-        plt.ylabel('Validation Loss')
-        plt.xlabel('Epoch')
-        plt.legend(['Generator', 'Discriminator', 'Total Loss'], loc='upper right', frameon = False)
-        plt.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/losses_plot.png"))
+        fig, ax = plt.subplots(1, 1, figsize=(axis_size*3, axis_size), squeeze=True)
+        ax.plot(gen_losses, linewidth = line_width)
+        ax.plot(disc_losses, linewidth = line_width)
+        ax.plot(model_losses, linewidth = line_width)
+        ax.set_ylim(ymin=0)
+        ax.set_ylabel('Validation Loss')
+        ax.set_xlabel('Epoch')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+
+        fig.legend(['Generator', 'Discriminator', 'Total Loss'], loc='lower center', frameon = False, ncol=3)
+        fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/losses_plot.png"))
         plt.clf()
 
         # Save losses as csv
@@ -392,33 +400,38 @@ Test set size = {self.test_data_n}
         
         
         # Visualise the validation set
-        axis_size = 8.0
+        
         plot_ratios = {'height_ratios': [1], 'width_ratios': [1,1,1]}
         fig, axs = plt.subplots(1, 3, figsize=(axis_size*3, axis_size), gridspec_kw=plot_ratios, squeeze=True)
-        fig.suptitle(f"Generator Validation at epoch {epoch+1}")
 
         # PCA plot
-        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], c = red, s = 10)
-        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], c = blue, s = 10)
+        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], c = red, s = point_size)
+        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], c = blue, s = point_size)
         axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
-        axs[0].set_xlabel("PC1")
-        axs[0].set_ylabel("PC2")
+        axs[0].set_xlabel("PC 1")
+        axs[0].set_ylabel("PC 2")
+        box = axs[0].get_position()
+        axs[0].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # t-SNE plot
-        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = red, s = 10)
-        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = blue, s = 10)
+        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = red, s = point_size)
+        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = blue, s = point_size)
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
+        box = axs[1].get_position()
+        axs[1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # UMAP plot
-        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], c = red, s = 10)
-        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], c = blue, s = 10)
+        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], c = red, s = point_size)
+        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], c = blue, s = point_size)
         axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
         axs[2].set_xlabel("UMAP 1")
         axs[2].set_ylabel("UMAP 2")
+        box = axs[2].get_position()
+        axs[2].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
         
-        fig.legend(loc = "lower center", ncol = 2, frameon = False)
+        fig.legend(loc = "lower center", ncol = 2, frameon = False, markerscale = 2.0)
         fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/training_validation_plot_{epoch+1:05d}.png"))
         plt.clf()
 
