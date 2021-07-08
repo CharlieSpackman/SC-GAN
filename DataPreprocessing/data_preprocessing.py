@@ -171,7 +171,7 @@ export_data_anno = export_data_anno.iloc[:,:-3]
 
 
 ### Generate a sample ###
-sample_n = 1000
+sample_n = 8000
 export_data_values = export_data_values.sample(sample_n)
 export_data_anno = export_data_anno.loc[export_data_values.index,:]
 

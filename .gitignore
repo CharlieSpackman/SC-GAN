@@ -9,3 +9,6 @@ ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
 **/*.pyc
 **/*.tsv
 **/*.Rhistory
+**/*.txt
+**/*.bat
+**/*.png

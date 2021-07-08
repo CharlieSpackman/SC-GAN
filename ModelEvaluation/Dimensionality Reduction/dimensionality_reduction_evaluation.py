@@ -19,6 +19,7 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -28,9 +29,9 @@ import sys
 
 # Set matplotlib settings
 plt.style.use('ggplot')
-SMALL_SIZE = 12
-MEDIUM_SIZE = 14
-BIGGER_SIZE = 16
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
 plt.rc('font', size=SMALL_SIZE)        
 plt.rc('axes', titlesize=MEDIUM_SIZE)   
 plt.rc('axes', labelsize=MEDIUM_SIZE)  
@@ -40,6 +41,9 @@ plt.rc('legend', fontsize=MEDIUM_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
 red = "#d1495b"
 blue = "#00798c"
+point_size = 50
+axis_size = 8
+
 
 # Update path to model for evaluation
 CHECKPOINT_PATH = get_path("../../models")
@@ -51,15 +55,17 @@ latest_model = tf.train.latest_checkpoint(get_path(f"{model_path}/ckpt"))
 
 # Define parameters
 SEED = 36
-VAL_SIZE = 200
+VAL_SIZE = 50
 
 
 ### Get data ###
 # Read in data
-data, _, _ = get_data("../../DataPreprocessing/GSE114727/")
+data, cells, anno = get_data("../../DataPreprocessing/GSE114727/")
 
 # Create a validations set
-_, validation_data = train_test_split(data, test_size=(VAL_SIZE/data.shape[0]), random_state=SEED)
+_, validation_data, _, validation_anno = train_test_split(data, anno, test_size=(VAL_SIZE), random_state=SEED)
+
+labels = validation_anno["Celltype (major-lineage)"].tolist()
 
 
 ### Read in the model ###
@@ -238,47 +244,71 @@ print("[INFO] Evaluation metrics created")
 
 
 ### Plot the data ###
+# Create a mapping between classes and colours
+color_map = {
+    "CD4Tconv"   : "#00798c",
+    "CD8T"    : "#d1495b",
+    "CD8Tex" : "#edae49",
+    "Tprolif"  : "#66a182",
+    "Treg"   : "#2e4057"}
+
+patchList = []
+# for key in color_map:
+#         data_key = mpatches.Patch(color=color_map[key], label=key, hatch = ".")
+#         patchList.append(data_key)
+
+for key in color_map:
+        data_key = plt.scatter([],[], s = point_size*3, marker=".", color = color_map[key], label=key)
+        patchList.append(data_key)
+
+plot_colors = list(map(color_map.get, labels))
+
 # Plot the results for sample correlation
 axis_size = 8.0
-plot_ratios = {'height_ratios': [1,1,1], 'width_ratios': [1,1]}
+plot_ratios = {'height_ratios': [1,1,1.1], 'width_ratios': [1,1]}
 fig, axs = plt.subplots(3, 2, figsize=(axis_size*3, axis_size*3), gridspec_kw=plot_ratios, squeeze=True)
 
 # PCA plot
-axs[0,0].scatter(validation_data_reduced_PCA[:,0], validation_data_reduced_PCA[:,1], label = "PCA", c = red)
-axs[0,0].title.set_text(f"PCA")
-axs[0,0].set_xlabel("PC1")
-axs[0,0].set_ylabel("PC2")
+axs[0,1].scatter(validation_data_reduced_PCA[:,0], validation_data_reduced_PCA[:,1], c = plot_colors, s = point_size)
+axs[0,1].title.set_text(f"PCA")
+axs[0,1].set_xlabel("PC 1")
+axs[0,1].set_ylabel("PC 2")
 
 # GAN + PCA plot
-axs[0,1].scatter(validation_data_gan_reduced_PCA[:,0], validation_data_gan_reduced_PCA[:,1], label = "GAN + PCA", c = blue)
-axs[0,1].title.set_text(f"GAN + PCA")
-axs[0,1].set_xlabel("PC1")
-axs[0,1].set_ylabel("PC2")
+axs[0,0].scatter(validation_data_gan_reduced_PCA[:,0], validation_data_gan_reduced_PCA[:,1], c = plot_colors, s = point_size)
+axs[0,0].title.set_text(f"GAN + PCA")
+axs[0,0].set_xlabel("PC 1")
+axs[0,0].set_ylabel("PC 2")
 
 # t-SNE plot
-axs[1,0].scatter(validation_data_reduced_TSNE[:,0], validation_data_reduced_TSNE[:,1], label = "TSNE", c = red)
-axs[1,0].title.set_text(f"t-SNE")
-axs[1,0].set_xlabel("TSNE 1")
-axs[1,0].set_ylabel("TSNE 2")
-
-# GAN + t-SNE plot
-axs[1,1].scatter(validation_data_gan_reduced_TSNE[:,0], validation_data_gan_reduced_TSNE[:,1], label = "GAN + TSNE", c = blue)
-axs[1,1].title.set_text(f"GAN + t-SNE")
+axs[1,1].scatter(validation_data_reduced_TSNE[:,0], validation_data_reduced_TSNE[:,1], c = plot_colors, s = point_size)
+axs[1,1].title.set_text(f"t-SNE")
 axs[1,1].set_xlabel("TSNE 1")
 axs[1,1].set_ylabel("TSNE 2")
 
-# UMAP plot
-axs[2,0].scatter(validation_data_reduced_UMAP[:,0], validation_data_reduced_UMAP[:,1], label = "UMAP", c = red)
-axs[2,0].title.set_text(f"UMAP")
-axs[2,0].set_xlabel("UMAP 1")
-axs[2,0].set_ylabel("UMAP 2")
+# GAN + t-SNE plot
+axs[1,0].scatter(validation_data_gan_reduced_TSNE[:,0], validation_data_gan_reduced_TSNE[:,1], c = plot_colors, s = point_size)
+axs[1,0].title.set_text(f"GAN + t-SNE")
+axs[1,0].set_xlabel("TSNE 1")
+axs[1,0].set_ylabel("TSNE 2")
 
-# GAN + UMAP plot
-axs[2,1].scatter(validation_data_gan_reduced_UMAP[:,0], validation_data_gan_reduced_UMAP[:,1], label = "GAN + UMAP", c = blue)
-axs[2,1].title.set_text(f"GAN + UMAP")
+# UMAP plot
+axs[2,1].scatter(validation_data_reduced_UMAP[:,0], validation_data_reduced_UMAP[:,1], c = plot_colors, s = point_size)
+axs[2,1].title.set_text(f"UMAP")
 axs[2,1].set_xlabel("UMAP 1")
 axs[2,1].set_ylabel("UMAP 2")
+box = axs[2,1].get_position()
+axs[2,1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
+# GAN + UMAP plot
+axs[2,0].scatter(validation_data_gan_reduced_UMAP[:,0], validation_data_gan_reduced_UMAP[:,1], label = "GAN + UMAP", c = plot_colors, s = point_size)
+axs[2,0].title.set_text(f"GAN + UMAP")
+axs[2,0].set_xlabel("UMAP 1")
+axs[2,0].set_ylabel("UMAP 2")
+box = axs[2,0].get_position()
+axs[2,0].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+
+fig.legend(handles = patchList, loc = "lower center", ncol = 5, frameon = False, markerscale=2, bbox_to_anchor = [0.5, 0.075])
 
 fig.savefig(fname=get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/images/dimensionality_reduction_plot_{EPOCH:05d}.png"))
 plt.clf() 

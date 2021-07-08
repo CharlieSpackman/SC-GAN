@@ -102,6 +102,20 @@ class SCGAN():
         ### Define the loss functions ###
         self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=False)
 
+        ### Create Networks ###
+        self.generator = self.build_generator()
+        self.discriminator = self.build_discriminator()
+
+        ### Define checkpoint ###
+        self.checkpoint = tf.train.Checkpoint(generator_optimizer=self.gen_optimizer,
+            discriminator_optimizer=self.disc_optimizer,
+            generator=self.generator,
+            discriminator=self.discriminator)
+
+
+    ### Initiatilise the data ###
+    def init_data(self):
+
         ### Split data into training and test sets ###
         self.train_data, self.test_data = train_test_split(self.data, train_size = 0.8, random_state = self.SEED) 
         self.train_data_n = self.train_data.shape[0]
@@ -112,20 +126,16 @@ class SCGAN():
         self.train_data = tf.data.Dataset.from_tensor_slices(self.train_data).shuffle(self.train_data.shape[0]).batch(self.BATCH_SIZE)
 
         self.test_data = self.test_data.astype('float32')
+        val_set = self.test_data.copy()
         self.test_data = tf.convert_to_tensor(self.test_data.astype('float32'))
 
         ### Create random validation noise ###
         self.val_noise = tf.random.normal([self.test_data_n, self.NOISE_DIM])
 
-        ### Create Networks ###
-        self.generator = self.build_generator()
-        self.discriminator = self.build_discriminator()
-
-        ### Define checkpoint ###
-        self.checkpoint = tf.train.Checkpoint(generator_optimizer=self.gen_optimizer,
-            discriminator_optimizer=self.disc_optimizer,
-            generator=self.generator,
-            discriminator=self.discriminator)
+        ### Create validation sets ###
+        self.val_PCA = PCA(n_components=2).fit_transform(val_set)
+        self.val_TSNE = TSNE(n_components=2).fit_transform(val_set)
+        self.val_UMAP = UMAP(n_components=2).fit_transform(val_set)
 
         # Create checkpoint directory if it doesn't already exist
         p = Path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}")
@@ -145,6 +155,7 @@ class SCGAN():
         # Layer 1
         model.add(Dense(input_dim=self.NOISE_DIM, units=600))
         model.add(LeakyReLU(alpha=alpha))
+        model.add(BatchNormalization())
 
         # # Layer 2
         # model.add(Dense(units=500))
@@ -158,7 +169,7 @@ class SCGAN():
 
         # Output Layer
         model.add(Dense(units=self.NUM_FEATURES))
-        model.add(Activation("tanh"))
+        model.add(LeakyReLU(alpha=alpha))
 
         return model
 
@@ -185,7 +196,7 @@ class SCGAN():
         # model.add(BatchNormalization())
 
         # sigmoid layer outputting a single value
-        model.add(Dense(1))
+        model.add(Dense(1, activation = "sigmoid"))
         
         # return the discriminator model
         return model
@@ -230,19 +241,19 @@ Test set size = {self.test_data_n}
     ### Define loss functions ###
     # Generator loss
     def gen_loss(self, fake_output):
-        # return self.cross_entropy(tf.ones_like(fake_output), fake_output)
-        return -tf.reduce_mean(fake_output)
+        return self.cross_entropy(tf.ones_like(fake_output), fake_output)
+        # return -tf.reduce_mean(fake_output)
 
     # Discriminator loss
     def disc_loss(self, real_output, fake_output):
 
-        # real_loss = self.cross_entropy(tf.ones_like(real_output), real_output)
-        # fake_loss = self.cross_entropy(tf.zeros_like(fake_output), fake_output)
-        # total_loss = real_loss + fake_loss
+        real_loss = self.cross_entropy(tf.ones_like(real_output), real_output)
+        fake_loss = self.cross_entropy(tf.zeros_like(fake_output), fake_output)
+        total_loss = real_loss + fake_loss
 
-        # return total_loss
+        return total_loss
 
-        return tf.reduce_mean(fake_output) - tf.reduce_mean(real_output)
+        # return tf.reduce_mean(fake_output) - tf.reduce_mean(real_output)
 
 
     def create_checkpoint(self, epoch):
@@ -301,7 +312,7 @@ Test set size = {self.test_data_n}
             real_output = self.discriminator(self.test_data, training=False)
             fake_output = self.discriminator(generated_samples, training=False)
 
-            gen_loss = -self.gen_loss(fake_output)
+            gen_loss = self.gen_loss(fake_output)
             disc_loss = self.disc_loss(real_output, fake_output)
 
             self.VAL_LOSS.append([gen_loss, disc_loss])
@@ -392,49 +403,33 @@ Test set size = {self.test_data_n}
             return dist
 
         # Create generated validation data
-        generated_samples = self.generator(self.val_noise, training=False)
-
-        # Integrate generated samples with the real validation set
-        validation_set =  tf.concat((self.test_data, generated_samples), axis = 0)
-        
-        # Create data set labels
-        validation_labels = tf.concat(
-            (tf.zeros(self.test_data_n),
-            tf.ones(self.test_data_n)),
-            axis = 0)
+        generated_samples = self.generator(self.val_noise, training=False).numpy()
 
         # Reduce the dataset with PCA
-        validation_set_reduced_PCA = PCA(n_components=2).fit_transform(validation_set)
-        generated_samples_reduced_PCA = validation_set_reduced_PCA[validation_labels==0]
-        test_set_reduced_PCA = validation_set_reduced_PCA[validation_labels==1]
+        noise_PCA = PCA(n_components=2).fit_transform(generated_samples)
         # Calculate the correlation between samples
-        hausdorff_dist_PCA = hausdorff_dist(test_set_reduced_PCA, generated_samples_reduced_PCA)
+        hausdorff_dist_PCA = hausdorff_dist(self.val_PCA, noise_PCA)
 
         # Reduce the dataset with t-SNE
-        validation_set_reduced_TSNE = TSNE(n_components=2).fit_transform(validation_set)
-        generated_samples_reduced_TSNE = validation_set_reduced_TSNE[validation_labels==0]
-        test_set_reduced_TSNE = validation_set_reduced_TSNE[validation_labels==1]
+        noise_TSNE = TSNE(n_components=2).fit_transform(generated_samples)
         # Calculate the correlation between samples
-        hausdorff_dist_TSNE = hausdorff_dist(test_set_reduced_TSNE, generated_samples_reduced_TSNE)
+        hausdorff_dist_TSNE = hausdorff_dist(self.val_TSNE, noise_TSNE)
 
         # Reduce the dataset with UMAP
-        validation_set_reduced_UMAP = UMAP(n_components=2).fit_transform(validation_set)
-        generated_samples_reduced_UMAP = validation_set_reduced_UMAP[validation_labels==0]
-        test_set_reduced_UMAP = validation_set_reduced_UMAP[validation_labels==1]
+        noise_UMAP = UMAP(n_components=2).fit_transform(generated_samples)
         # Calculate the correlation between samples
-        hausdorff_dist_UMAP = hausdorff_dist(test_set_reduced_UMAP, generated_samples_reduced_UMAP)
+        hausdorff_dist_UMAP = hausdorff_dist(self.val_UMAP, noise_UMAP)
         
         # Save distances
         self.HAUSDORFF_DIST.append([epoch+1, hausdorff_dist_PCA, hausdorff_dist_TSNE, hausdorff_dist_UMAP])
 
         # Visualise the validation set
-        
         plot_ratios = {'height_ratios': [1], 'width_ratios': [1,1,1]}
         fig, axs = plt.subplots(1, 3, figsize=(axis_size*3, axis_size), gridspec_kw=plot_ratios, squeeze=True)
 
         # PCA plot
-        axs[0].scatter(generated_samples_reduced_PCA[:,0], generated_samples_reduced_PCA[:,1], c = red, s = point_size)
-        axs[0].scatter(test_set_reduced_PCA[:,0], test_set_reduced_PCA[:,1], c = blue, s = point_size)
+        axs[0].scatter(noise_PCA[:,0], noise_PCA[:,1], c = red, s = point_size)
+        axs[0].scatter(self.val_PCA[:,0], self.val_PCA[:,1], c = blue, s = point_size)
         axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
         axs[0].set_xlabel("PC 1")
         axs[0].set_ylabel("PC 2")
@@ -442,8 +437,8 @@ Test set size = {self.test_data_n}
         axs[0].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # t-SNE plot
-        axs[1].scatter(generated_samples_reduced_TSNE[:,0], generated_samples_reduced_TSNE[:,1], label = "Generated", c = red, s = point_size)
-        axs[1].scatter(test_set_reduced_TSNE[:,0], test_set_reduced_TSNE[:,1], label = "Real", c = blue, s = point_size)
+        axs[1].scatter(noise_TSNE[:,0], noise_TSNE[:,1], label = "Generated", c = red, s = point_size)
+        axs[1].scatter(self.val_TSNE[:,0], self.val_TSNE[:,1], label = "Real", c = blue, s = point_size)
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
@@ -451,8 +446,8 @@ Test set size = {self.test_data_n}
         axs[1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # UMAP plot
-        axs[2].scatter(generated_samples_reduced_UMAP[:,0], generated_samples_reduced_UMAP[:,1], c = red, s = point_size)
-        axs[2].scatter(test_set_reduced_UMAP[:,0], test_set_reduced_UMAP[:,1], c = blue, s = point_size)
+        axs[2].scatter(noise_UMAP[:,0], noise_UMAP[:,1], c = red, s = point_size)
+        axs[2].scatter(self.val_UMAP[:,0], self.val_UMAP[:,1], c = blue, s = point_size)
         axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
         axs[2].set_xlabel("UMAP 1")
         axs[2].set_ylabel("UMAP 2")
