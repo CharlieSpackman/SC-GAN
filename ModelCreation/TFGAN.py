@@ -68,7 +68,9 @@ class SCGAN():
         EPOCHS = 10000, 
         BATCH_SIZE = 50, 
         NOISE_DIM = 100, 
-        SEED = 36):
+        SEED = 36,
+        checkpoint_freq = 100,
+        eval_freq = 2000):
         
         self.data = data
 
@@ -79,9 +81,12 @@ class SCGAN():
         self.BATCH_SIZE = BATCH_SIZE
         self.NOISE_DIM = NOISE_DIM
         self.SEED = SEED
+        self.checkpoint_freq = checkpoint_freq
+        self.eval_freq = eval_freq
         self.NUM_FEATURES = self.data.shape[1]
         self.CHECKPOINT_PATH = CHECKPOINT_PATH
         self.VAL_LOSS = []
+        self.HAUSDORFF_DIST = []
         self.FILE_NAME = "{}_{}_{}_{}_{}_{}".format(
             self.GEN_LRATE,
             self.DISC_LRATE,
@@ -138,9 +143,8 @@ class SCGAN():
         model = Sequential(name="Generator")
 
         # Layer 1
-        model.add(Dense(input_dim=self.NOISE_DIM, units=500))
+        model.add(Dense(input_dim=self.NOISE_DIM, units=600))
         model.add(LeakyReLU(alpha=alpha))
-        model.add(BatchNormalization())
 
         # # Layer 2
         # model.add(Dense(units=500))
@@ -226,16 +230,19 @@ Test set size = {self.test_data_n}
     ### Define loss functions ###
     # Generator loss
     def gen_loss(self, fake_output):
-        return self.cross_entropy(tf.ones_like(fake_output), fake_output)
+        # return self.cross_entropy(tf.ones_like(fake_output), fake_output)
+        return -tf.reduce_mean(fake_output)
 
     # Discriminator loss
     def disc_loss(self, real_output, fake_output):
 
-        real_loss = self.cross_entropy(tf.ones_like(real_output), real_output)
-        fake_loss = self.cross_entropy(tf.zeros_like(fake_output), fake_output)
-        total_loss = real_loss + fake_loss
+        # real_loss = self.cross_entropy(tf.ones_like(real_output), real_output)
+        # fake_loss = self.cross_entropy(tf.zeros_like(fake_output), fake_output)
+        # total_loss = real_loss + fake_loss
 
-        return total_loss
+        # return total_loss
+
+        return tf.reduce_mean(fake_output) - tf.reduce_mean(real_output)
 
 
     def create_checkpoint(self, epoch):
@@ -294,19 +301,19 @@ Test set size = {self.test_data_n}
             real_output = self.discriminator(self.test_data, training=False)
             fake_output = self.discriminator(generated_samples, training=False)
 
-            gen_loss = self.gen_loss(fake_output)
+            gen_loss = -self.gen_loss(fake_output)
             disc_loss = self.disc_loss(real_output, fake_output)
 
             self.VAL_LOSS.append([gen_loss, disc_loss])
 
             print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
 
-            # Save the model every 50 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 50 == 0:
+            # Save the model at the specified frequency
+            if (epoch + 1) % self.checkpoint_freq == 0:
                 self.create_checkpoint(epoch)
 
-            # Evaluate the model every 2000 epochs - DON'T FORGET TO UPDATE THESE
-            if (epoch + 1) % 2000 == 0:
+            # Evaluate the model at the specified frequency
+            if (epoch + 1) % self.eval_freq == 0:
                 self.evaluate_model(epoch)
 
             
@@ -317,6 +324,7 @@ Test set size = {self.test_data_n}
 
     def produce_loss_graph(self):
 
+        # Model losses
         # Convert list of lists into a numpy arrays
         gen_losses = pd.Series([loss[0].numpy() for loss in self.VAL_LOSS])
         disc_losses = pd.Series([loss[1].numpy() for loss in self.VAL_LOSS])
@@ -331,6 +339,24 @@ Test set size = {self.test_data_n}
 
         # Save losses as csv
         combined_losses.to_csv(get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/losses.csv"), index=False)
+
+        # Distances
+        # Convert list of lists into a numpy arrays
+        epochs = pd.Series([loss[0] for loss in self.HAUSDORFF_DIST])
+        PCA_losses = pd.Series([loss[1] for loss in self.HAUSDORFF_DIST])
+        TSNE_losses = pd.Series([loss[2] for loss in self.HAUSDORFF_DIST])
+        UMAP_losses = pd.Series([loss[3] for loss in self.HAUSDORFF_DIST])
+
+        # Combine losses in a dataframe
+        distance_losses = pd.DataFrame(
+            {"epoch": epochs,
+            "pca_loss": PCA_losses,
+            "tsne_loss": TSNE_losses,
+            "umap_loss": UMAP_losses}
+            )
+
+        # Save losses as csv
+        distance_losses.to_csv(get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/distance_losses.csv"), index=False)
 
         # Create loss graph
         fig, ax = plt.subplots(1, 1, figsize=(axis_size*3, axis_size), squeeze=True)
@@ -398,7 +424,9 @@ Test set size = {self.test_data_n}
         # Calculate the correlation between samples
         hausdorff_dist_UMAP = hausdorff_dist(test_set_reduced_UMAP, generated_samples_reduced_UMAP)
         
-        
+        # Save distances
+        self.HAUSDORFF_DIST.append([epoch+1, hausdorff_dist_PCA, hausdorff_dist_TSNE, hausdorff_dist_UMAP])
+
         # Visualise the validation set
         
         plot_ratios = {'height_ratios': [1], 'width_ratios': [1,1,1]}
