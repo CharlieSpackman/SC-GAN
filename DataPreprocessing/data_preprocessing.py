@@ -142,7 +142,7 @@ integrated_adata.raw = integrated_adata
 integrated_adata = integrated_adata[:, integrated_adata.var.highly_variable]
 
 # Scale the data
-sc.pp.scale(integrated_adata, max_value=10)
+sc.pp.scale(integrated_adata)
 
 ### Checking data quality ###
 print("[INFO] Checking data quality")
@@ -171,9 +171,9 @@ export_data_anno = export_data_anno.iloc[:,:-3]
 
 
 ### Generate a sample ###
-sample_n = 8000
-export_data_values = export_data_values.sample(sample_n)
-export_data_anno = export_data_anno.loc[export_data_values.index,:]
+# sample_n = 8000
+# export_data_values = export_data_values.sample(sample_n)
+# export_data_anno = export_data_anno.loc[export_data_values.index,:]
 
 # Save count matrix
 export_data_values.to_csv("GSE114727\\GSE114727_processed_data.csv")

@@ -12,3 +12,7 @@ ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
 **/*.txt
 **/*.bat
 **/*.png
+**/*.ipynb
+ModelCreation/github_gan.py
+ModelCreation/Adam_prediction.py
+ModelCreation/TFGAN_test.py
