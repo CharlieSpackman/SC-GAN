@@ -97,9 +97,8 @@ class SCGAN():
         self.CHECKPOINT_PATH = CHECKPOINT_PATH
         self.VAL_LOSS = []
         self.HAUSDORFF_DIST = []
-        self.FILE_NAME = "{}_{}_{}_{}_{}_{}".format(
-            self.GEN_LRATE,
-            self.DISC_LRATE,
+        self.FILE_NAME = "{}_{}_{}_{}_{}".format(
+            self.LRATE,
             self.EPOCHS,
             self.BATCH_SIZE,
             self.NOISE_DIM,
@@ -111,7 +110,7 @@ class SCGAN():
         ### Define labels ###
         self.valid_labels = -tf.ones((self.BATCH_SIZE, 1), dtype=tf.dtypes.float32)
         self.fake_labels = tf.ones((self.BATCH_SIZE, 1), dtype=tf.dtypes.float32)
-
+        
         ### Create Networks ###
         self.discriminator = self.build_discriminator()
         self.discriminator.compile(loss=self.wasserstein_loss,
@@ -154,9 +153,9 @@ class SCGAN():
         self.test_data = self.test_data.astype('float32')
 
         ### Create reduced validation sets ###
-        self.val_PCA = PCA(n_components=2).fit_transform(self.test_data)
-        self.val_TSNE = TSNE(n_components=2).fit_transform(self.test_data)
-        self.val_UMAP = UMAP(n_components=2).fit_transform(self.test_data)
+        self.val_PCA = rescale_arr(PCA(n_components=2).fit_transform(self.test_data))
+        self.val_TSNE = rescale_arr(TSNE(n_components=2).fit_transform(self.test_data))
+        self.val_UMAP = rescale_arr(UMAP(n_components=2).fit_transform(self.test_data))
         self.val_labels = np.concatenate((np.zeros((self.test_data_n,)), np.ones((self.test_data_n, ))), axis = 0)
 
         # Create checkpoint directory if it doesn't already exist
@@ -201,16 +200,16 @@ class SCGAN():
         model.add(Dropout(rate = rate))
 
         # Layer 2
-        model.add(Dense(units = 400))
+        model.add(Dense(units = 300))
         model.add(BatchNormalization())
         model.add(LeakyReLU(alpha=alpha))
         model.add(Dropout(rate = rate))
 
-        # Layer 3
-        model.add(Dense(units = 100))
-        model.add(BatchNormalization())
-        model.add(LeakyReLU(alpha=alpha))
-        model.add(Dropout(rate = rate))
+        # # Layer 3
+        # model.add(Dense(units = 100))
+        # model.add(BatchNormalization())
+        # model.add(LeakyReLU(alpha=alpha))
+        # model.add(Dropout(rate = rate))
 
         # Output layer
         model.add(Dense(1, activation = "linear"))
@@ -242,8 +241,7 @@ class SCGAN():
     def get_learning_parameters(self):
 
         parameters = f"""---Learning Parameters---
-Generator Learning rate = {self.GEN_LRATE}
-Discriminator Learning rate = {self.DISC_LRATE}
+Learning rate = {self.LRATE}
 Epochs = {self.EPOCHS}
 Batch size = {self.BATCH_SIZE}
 Noise size = {self.NOISE_DIM}
@@ -402,23 +400,23 @@ Test set size = {self.test_data_n}
         generated_samples = self.generator.predict(noise)
 
         # Reduce the dataset with PCA
-        noise_PCA = PCA(n_components=2).fit_transform(generated_samples)
+        noise_PCA = rescale_arr(PCA(n_components=2).fit_transform(generated_samples))
         # Combine and rescale data
-        combined_PCA = rescale_arr(np.concatenate((self.val_PCA, noise_PCA), axis = 0))
+        combined_PCA = np.concatenate((self.val_PCA, noise_PCA), axis = 0)
         # Calculate the correlation between samples
         hausdorff_dist_PCA = hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
         # Reduce the dataset with TSNE
-        noise_TSNE = TSNE(n_components=2).fit_transform(generated_samples)
+        noise_TSNE = rescale_arr(TSNE(n_components=2).fit_transform(generated_samples))
         # Combine and rescale data
-        combined_TSNE = rescale_arr(np.concatenate((self.val_TSNE, noise_TSNE), axis = 0))
+        combined_TSNE = np.concatenate((self.val_TSNE, noise_TSNE), axis = 0)
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
 
         # Reduce the dataset with UMAP
-        noise_UMAP = UMAP(n_components=2).fit_transform(generated_samples)
+        noise_UMAP = rescale_arr(UMAP(n_components=2).fit_transform(generated_samples))
         # Combine and rescale data
-        combined_UMAP = rescale_arr(np.concatenate((self.val_UMAP, noise_UMAP), axis = 0))
+        combined_UMAP = np.concatenate((self.val_UMAP, noise_UMAP), axis = 0)
         # Calculate the correlation between samples
         hausdorff_dist_UMAP = hausdorff_dist(combined_UMAP[self.val_labels==0], combined_UMAP[self.val_labels==1])
         
