@@ -260,21 +260,22 @@ Test set size = {self.test_data_n}
     @tf.function
     def train_disc(self, batch, noise):
 
-        with tf.GradientTape(persistent=True) as disc_tape:
+        with tf.GradientTape() as disc_tape:
             
             generated_samples = self.generator(noise, training=False)
-
-            real_output = self.discriminator(batch, training=True)
             fake_output = self.discriminator(generated_samples, training=True)
-
-            real_loss = self.wasserstein_loss(real_output, self.valid_labels)
             fake_loss = self.wasserstein_loss(fake_output, self.fake_labels)
 
-        real_gradients_of_discriminator = disc_tape.gradient(real_loss, self.discriminator.trainable_variables)
         fake_gradients_of_discriminator = disc_tape.gradient(fake_loss, self.discriminator.trainable_variables)
-
-        self.disc_optimizer.apply_gradients(zip(real_gradients_of_discriminator, self.discriminator.trainable_variables))
         self.disc_optimizer.apply_gradients(zip(fake_gradients_of_discriminator, self.discriminator.trainable_variables))
+
+        with tf.GradientTape() as disc_tape:
+
+            real_output = self.discriminator(batch, training=True)
+            real_loss = self.wasserstein_loss(real_output, self.valid_labels)
+
+        real_gradients_of_discriminator = disc_tape.gradient(real_loss, self.discriminator.trainable_variables)
+        self.disc_optimizer.apply_gradients(zip(real_gradients_of_discriminator, self.discriminator.trainable_variables))
 
         return None
 
