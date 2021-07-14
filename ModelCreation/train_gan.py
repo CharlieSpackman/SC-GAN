@@ -10,14 +10,14 @@ data, _, _ = get_data("../DataPreprocessing/GSE114727/")
 gan = SCGAN(
     data = data,
     CHECKPOINT_PATH = "../models", 
-    GEN_LRATE = 0.00001,
-    DISC_LRATE = 0.00001, 
-    EPOCHS = 1000, 
-    BATCH_SIZE = 250, 
+    GEN_LRATE = 0.0001,
+    DISC_LRATE = 0.0001, 
+    EPOCHS = 5000, 
+    BATCH_SIZE = 50, 
     NOISE_DIM = 100, 
-    SEED = 30,
+    SEED = 10,
     checkpoint_freq = 200,
-    eval_freq = 1000)
+    eval_freq = 500)
 
 # Initialise the data
 gan.init_data()

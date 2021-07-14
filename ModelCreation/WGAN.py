@@ -3,8 +3,8 @@
 # Import modules
 import tensorflow as tf
 tf.compat.v1.logging.set_verbosity('ERROR')
-from tensorflow.keras.models import Sequential 
-from tensorflow.keras.layers import LeakyReLU, Activation, Dense, BatchNormalization, Dropout
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import LeakyReLU, Dense, BatchNormalization, Dropout, Input
 from tensorflow.keras.optimizers import RMSprop
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
@@ -31,10 +31,10 @@ plt.rc('legend', fontsize=MEDIUM_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
 red = "#d1495b"
 blue = "#00798c"
-point_size = 20
-legend_point_size = 40
-line_width = 1.5
-axis_size = 8
+point_size = 20.0
+legend_point_size = 40.0
+line_width = 3.0
+axis_size = 8.0
 
 
 # Define a helper function for handling paths
@@ -57,28 +57,34 @@ def get_data(folder_path):
 
     return data, cells, anno
 
+# Define a helper function to rescale an array
+def rescale_arr(arr):
+
+    arr[:,0] = 10 * (2.*(arr[:,0] - np.min(arr[:,0]))/np.ptp(arr[:,0])-1)
+    arr[:,1] = 10 * (2.*(arr[:,1] - np.min(arr[:,1]))/np.ptp(arr[:,1])-1)
+
+    return arr
+
 ### Define Class container for training procedure ###
 class SCGAN():
 
     def __init__(self, 
         data, 
         CHECKPOINT_PATH = get_path("../models"), 
-        GEN_LRATE = 0.00001,
-        DISC_LRATE = 0.00001, 
-        EPOCHS = 15000, 
+        LRATE = 0.00001,
+        EPOCHS = 30000, 
         BATCH_SIZE = 250, 
         NOISE_DIM = 100, 
         SEED = 36,
         DISC_UPDATES = 5,
         CLIP_VALUE = 0.01,
-        checkpoint_freq = 100,
+        checkpoint_freq = 200,
         eval_freq = 2000):
         
         self.data = data
 
         ### Define model parameters ###
-        self.GEN_LRATE = GEN_LRATE
-        self.DISC_LRATE = DISC_LRATE
+        self.LRATE = LRATE
         self.EPOCHS = EPOCHS
         self.BATCH_SIZE = BATCH_SIZE
         self.NOISE_DIM = NOISE_DIM
@@ -100,20 +106,37 @@ class SCGAN():
             self.SEED)
 
         ### Define Optimizers ###
-        self.gen_optimizer = RMSprop(self.GEN_LRATE)
-        self.disc_optimizer = RMSprop(self.DISC_LRATE)
+        self.optimizer = RMSprop(self.LRATE)
 
         ### Define labels ###
-        self.valid_labels = -tf.ones((self.BATCH_SIZE, 1))
-        self.fake_labels = tf.ones((self.BATCH_SIZE, 1))
+        self.valid_labels = -tf.ones((self.BATCH_SIZE, 1), dtype=tf.dtypes.float32)
+        self.fake_labels = tf.ones((self.BATCH_SIZE, 1), dtype=tf.dtypes.float32)
 
         ### Create Networks ###
-        self.generator = self.build_generator()
         self.discriminator = self.build_discriminator()
+        self.discriminator.compile(loss=self.wasserstein_loss,
+            optimizer=self.optimizer,
+            metrics = ['accuracy'])
+
+        self.generator = self.build_generator()
+
+        z = Input(shape=(self.NOISE_DIM,))
+        img = self.generator(z)
+
+        # For the combined model we will only train the generator
+        self.discriminator.trainable = False
+
+        # The discriminator takes generated images as input and determines validity
+        valid = self.discriminator(img)
+
+        # The combined model  (stacked generator and discriminator)
+        self.combined = Model(z, valid)
+        self.combined.compile(loss=self.wasserstein_loss,
+            optimizer=self.optimizer,
+            metrics = ['accuracy'])
 
         ### Define checkpoint ###
-        self.checkpoint = tf.train.Checkpoint(generator_optimizer=self.gen_optimizer,
-            discriminator_optimizer=self.disc_optimizer,
+        self.checkpoint = tf.train.Checkpoint(optimizer=self.optimizer,
             generator=self.generator,
             discriminator=self.discriminator)
 
@@ -126,23 +149,15 @@ class SCGAN():
         self.train_data_n = self.train_data.shape[0]
         self.test_data_n = self.test_data.shape[0]
 
-        ### Batch and Suffle the data ###
+        ### Convert to the correct dtype ###
         self.train_data = self.train_data.astype('float32')
-        self.train_data = tf.data.Dataset.from_tensor_slices(self.train_data).shuffle(self.train_data.shape[0]).batch(self.BATCH_SIZE, drop_remainder=True)
-
         self.test_data = self.test_data.astype('float32')
-        val_set = self.test_data.copy()
-        self.test_data = tf.convert_to_tensor(self.test_data.astype('float32'))
 
-        ### Create random validation noise ###
-        self.val_noise = tf.random.normal([self.test_data_n, self.NOISE_DIM])
-        self.val_valid_labels = -tf.ones((self.test_data_n, 1))
-        self.val_fake_labels = tf.ones((self.test_data_n, 1))
-
-        ### Create validation sets ###
-        self.val_PCA = PCA(n_components=2).fit_transform(val_set)
-        self.val_TSNE = TSNE(n_components=2).fit_transform(val_set)
-        self.val_UMAP = UMAP(n_components=2).fit_transform(val_set)
+        ### Create reduced validation sets ###
+        self.val_PCA = PCA(n_components=2).fit_transform(self.test_data)
+        self.val_TSNE = TSNE(n_components=2).fit_transform(self.test_data)
+        self.val_UMAP = UMAP(n_components=2).fit_transform(self.test_data)
+        self.val_labels = np.concatenate((np.zeros((self.test_data_n,)), np.ones((self.test_data_n, ))), axis = 0)
 
         # Create checkpoint directory if it doesn't already exist
         p = Path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}")
@@ -170,7 +185,10 @@ class SCGAN():
         # Output Layer
         model.add(Dense(units=self.NUM_FEATURES, activation="tanh"))
 
-        return model
+        noise = Input(shape=(self.NOISE_DIM,))
+        img = model(noise)
+
+        return Model(noise, img)
 
     # Discriminator network
     def build_discriminator(self, alpha=0.2, rate = 0.2):
@@ -180,26 +198,27 @@ class SCGAN():
         # Layer 1
         model.add(Dense(input_dim=self.NUM_FEATURES, units = 600))
         model.add(LeakyReLU(alpha=alpha))
-        model.add(BatchNormalization())
         model.add(Dropout(rate = rate))
 
         # Layer 2
         model.add(Dense(units = 400))
-        model.add(LeakyReLU(alpha=alpha))
         model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=alpha))
         model.add(Dropout(rate = rate))
 
         # Layer 3
         model.add(Dense(units = 100))
-        model.add(LeakyReLU(alpha=alpha))
         model.add(BatchNormalization())
+        model.add(LeakyReLU(alpha=alpha))
         model.add(Dropout(rate = rate))
 
         # Output layer
         model.add(Dense(1, activation = "linear"))
-        
-        # return the discriminator model
-        return model
+
+        img = Input(shape=self.NUM_FEATURES)
+        validity = model(img)
+
+        return Model(img, validity)
 
     # Define a function to print model summaries
     def get_model_summaries(self):
@@ -240,7 +259,7 @@ Test set size = {self.test_data_n}
 
     ### Define loss functions ###
     def wasserstein_loss(self, y_true, y_pred):
-        return tf.math.reduce_mean(y_true * y_pred)
+        return tf.keras.backend.mean(y_true * y_pred)
 
 
     def create_checkpoint(self, epoch):
@@ -252,46 +271,6 @@ Test set size = {self.test_data_n}
 
         print("[INFO] creating checkpoint")
         self.checkpoint.save(file_prefix = path)
-
-        return None
-
-
-    ### Define the main training step based on one input ###
-    @tf.function
-    def train_disc(self, batch, noise):
-
-        with tf.GradientTape() as disc_tape:
-            
-            generated_samples = self.generator(noise, training=False)
-            fake_output = self.discriminator(generated_samples, training=True)
-            fake_loss = self.wasserstein_loss(fake_output, self.fake_labels)
-
-        fake_gradients_of_discriminator = disc_tape.gradient(fake_loss, self.discriminator.trainable_variables)
-        self.disc_optimizer.apply_gradients(zip(fake_gradients_of_discriminator, self.discriminator.trainable_variables))
-
-        with tf.GradientTape() as disc_tape:
-
-            real_output = self.discriminator(batch, training=True)
-            real_loss = self.wasserstein_loss(real_output, self.valid_labels)
-
-        real_gradients_of_discriminator = disc_tape.gradient(real_loss, self.discriminator.trainable_variables)
-        self.disc_optimizer.apply_gradients(zip(real_gradients_of_discriminator, self.discriminator.trainable_variables))
-
-        return None
-
-    ### Define the main training step based on one input ###
-    @tf.function
-    def train_gen(self, noise):
-
-        with tf.GradientTape() as gen_tape:
-
-            generated_samples = self.generator(noise, training=True)
-
-            fake_output = self.discriminator(generated_samples, training=False)
-
-            gen_loss = self.wasserstein_loss(fake_output, self.valid_labels)
-            gradients_of_generator = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
-            self.gen_optimizer.apply_gradients(zip(gradients_of_generator, self.generator.trainable_variables))
 
         return None
 
@@ -309,41 +288,36 @@ Test set size = {self.test_data_n}
             epoch_start = time.time()
 
             ### Train Discriminator ###
-            # Get a random set of batches
-            batches = self.train_data.shuffle(1000, reshuffle_each_iteration=True).take(self.DISC_UPDATES)
-
             # Loop through each batch and update Discriminator
-            for batch in batches:
-                # Create random noise
+            for _ in range(self.DISC_UPDATES):
+                # Get a random set of batches
+                idx = np.random.randint(0, self.train_data_n, self.BATCH_SIZE)
+                batch = self.train_data[idx]
+                # Create random noise and generate samples
                 noise = tf.random.normal([self.BATCH_SIZE, self.NOISE_DIM])
+                generated_samples = self.generator.predict(noise)
 
-                # Update weights
-                self.train_disc(batch, noise)
+                # Train the Discriminator
+                real_loss = self.discriminator.train_on_batch(batch, self.valid_labels)
+                fake_loss = self.discriminator.train_on_batch(generated_samples, self.fake_labels)
+                disc_loss = 0.5 * np.add(fake_loss, real_loss)
 
-                # Clip critic weights
+                # Clip discriminator weights
                 for layer in self.discriminator.layers:
                     weights = layer.get_weights()
                     weights = [np.clip(weight, -self.CLIP_VALUE, self.CLIP_VALUE) for weight in weights]
                     layer.set_weights(weights)
             
             ### Train Generator ###
-            self.train_gen(noise)
+            gen_loss = self.combined.train_on_batch(noise, self.valid_labels)
 
-            ### Get validation losses ###
-            generated_samples = self.generator(self.val_noise, training=False)
+            ### Append losses ###
+            self.VAL_LOSS.append([1 - gen_loss[0], 1 - disc_loss[0]])
 
-            real_output = self.discriminator(self.test_data, training=False)
-            fake_output = self.discriminator(generated_samples, training=False)
-
-            real_loss = self.wasserstein_loss(real_output, self.val_valid_labels)
-            fake_loss = self.wasserstein_loss(fake_output, self.val_fake_labels)
-            disc_loss = 0.5 * np.add(real_loss, fake_loss)
-
-            gen_loss = self.wasserstein_loss(fake_output, self.val_valid_labels)
-
-            self.VAL_LOSS.append([gen_loss, disc_loss, real_loss, fake_loss])
-
-            print ('completed in {} seconds'.format(round(time.time()-epoch_start, 2)))
+            print('completed in {} seconds [G {}] [D {}]'.format(
+                round(time.time()-epoch_start, 2), 
+                round(1 - gen_loss[0], 6),
+                round(1 - disc_loss[0], 6)))
 
             # Save the model at the specified frequency
             if (epoch + 1) % self.checkpoint_freq == 0:
@@ -363,17 +337,13 @@ Test set size = {self.test_data_n}
 
         # Model losses
         # Convert list of lists into a numpy arrays
-        gen_losses = pd.Series([loss[0].numpy() for loss in self.VAL_LOSS])
+        gen_losses = pd.Series([loss[0] for loss in self.VAL_LOSS])
         disc_losses = pd.Series([loss[1] for loss in self.VAL_LOSS])
-        real_losses = pd.Series([loss[2] for loss in self.VAL_LOSS])
-        fake_losses = pd.Series([loss[3] for loss in self.VAL_LOSS])
 
         # Combine losses in a dataframe
         combined_losses = pd.DataFrame(
             {"gen_loss": gen_losses,
-            "disc_loss": disc_losses,
-            "real_losses": real_losses,
-            "fake_losses": fake_losses}
+            "disc_loss": disc_losses}
             )
 
         # Save losses as csv
@@ -397,17 +367,17 @@ Test set size = {self.test_data_n}
         # Save losses as csv
         distance_losses.to_csv(get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/data/distance_losses.csv"), index=False)
 
-        # Create loss graph
+        # Create training loss graph
         fig, ax = plt.subplots(1, 1, figsize=(axis_size*3, axis_size), squeeze=True)
         ax.plot(gen_losses, linewidth = line_width)
-        ax.plot(real_losses, linewidth = line_width)
-        ax.plot(fake_losses, linewidth = line_width)
+        ax.plot(disc_losses, linewidth = line_width)
         ax.set_ylabel('Validation Loss')
         ax.set_xlabel('Epoch')
         box = ax.get_position()
         ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
-        fig.legend(['Generator Loss', 'Discriminator: Real Loss', 'Discriminator: Fake Loss'], loc='lower center', frameon = False, ncol=3)
+        fig.legend(['Generator Loss', 'Discriminator Loss'], loc='lower center', frameon = False, ncol=2)
+
         fig.savefig(fname=get_path(f"{self.CHECKPOINT_PATH}/{self.FILE_NAME}/images/losses_plot.png"))
         plt.clf()
 
@@ -428,22 +398,29 @@ Test set size = {self.test_data_n}
             return dist
 
         # Create generated validation data
-        generated_samples = self.generator(self.val_noise, training=False).numpy()
+        noise = tf.random.normal([self.test_data_n, self.NOISE_DIM])
+        generated_samples = self.generator.predict(noise)
 
         # Reduce the dataset with PCA
         noise_PCA = PCA(n_components=2).fit_transform(generated_samples)
+        # Combine and rescale data
+        combined_PCA = rescale_arr(np.concatenate((self.val_PCA, noise_PCA), axis = 0))
         # Calculate the correlation between samples
-        hausdorff_dist_PCA = hausdorff_dist(self.val_PCA, noise_PCA)
+        hausdorff_dist_PCA = hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
-        # Reduce the dataset with t-SNE
+        # Reduce the dataset with TSNE
         noise_TSNE = TSNE(n_components=2).fit_transform(generated_samples)
+        # Combine and rescale data
+        combined_TSNE = rescale_arr(np.concatenate((self.val_TSNE, noise_TSNE), axis = 0))
         # Calculate the correlation between samples
-        hausdorff_dist_TSNE = hausdorff_dist(self.val_TSNE, noise_TSNE)
+        hausdorff_dist_TSNE = hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
 
         # Reduce the dataset with UMAP
         noise_UMAP = UMAP(n_components=2).fit_transform(generated_samples)
+        # Combine and rescale data
+        combined_UMAP = rescale_arr(np.concatenate((self.val_UMAP, noise_UMAP), axis = 0))
         # Calculate the correlation between samples
-        hausdorff_dist_UMAP = hausdorff_dist(self.val_UMAP, noise_UMAP)
+        hausdorff_dist_UMAP = hausdorff_dist(combined_UMAP[self.val_labels==0], combined_UMAP[self.val_labels==1])
         
         # Save distances
         self.HAUSDORFF_DIST.append([epoch+1, hausdorff_dist_PCA, hausdorff_dist_TSNE, hausdorff_dist_UMAP])
@@ -453,8 +430,8 @@ Test set size = {self.test_data_n}
         fig, axs = plt.subplots(1, 3, figsize=(axis_size*3, axis_size), gridspec_kw=plot_ratios, squeeze=True)
 
         # PCA plot
-        axs[0].scatter(noise_PCA[:,0], noise_PCA[:,1], c = red, s = point_size)
-        axs[0].scatter(self.val_PCA[:,0], self.val_PCA[:,1], c = blue, s = point_size)
+        axs[0].scatter(combined_PCA[self.val_labels==0, 0], combined_PCA[self.val_labels==0, 1], c = red, s = point_size)
+        axs[0].scatter(combined_PCA[self.val_labels==1, 0], combined_PCA[self.val_labels==1, 1], c = blue, s = point_size)
         axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
         axs[0].set_xlabel("PC 1")
         axs[0].set_ylabel("PC 2")
@@ -462,8 +439,8 @@ Test set size = {self.test_data_n}
         axs[0].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # t-SNE plot
-        axs[1].scatter(noise_TSNE[:,0], noise_TSNE[:,1], label = "Generated", c = red, s = point_size)
-        axs[1].scatter(self.val_TSNE[:,0], self.val_TSNE[:,1], label = "Real", c = blue, s = point_size)
+        axs[1].scatter(combined_TSNE[self.val_labels==0, 0], combined_TSNE[self.val_labels==0, 1], label = "Real", c = red, s = point_size)
+        axs[1].scatter(combined_TSNE[self.val_labels==1, 0], combined_TSNE[self.val_labels==1, 1], label = "Generated", c = blue, s = point_size)
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
@@ -471,8 +448,8 @@ Test set size = {self.test_data_n}
         axs[1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
         # UMAP plot
-        axs[2].scatter(noise_UMAP[:,0], noise_UMAP[:,1], c = red, s = point_size)
-        axs[2].scatter(self.val_UMAP[:,0], self.val_UMAP[:,1], c = blue, s = point_size)
+        axs[2].scatter(combined_UMAP[self.val_labels==0, 0], combined_UMAP[self.val_labels==0, 1], c = red, s = point_size)
+        axs[2].scatter(combined_UMAP[self.val_labels==1, 0], combined_UMAP[self.val_labels==1, 1], c = blue, s = point_size)
         axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
         axs[2].set_xlabel("UMAP 1")
         axs[2].set_ylabel("UMAP 2")
