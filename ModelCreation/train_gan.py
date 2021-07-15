@@ -1,7 +1,7 @@
 # Main.py
 
 # Import modules
-from WGAN import SCGAN, get_data
+from WGAN_GP import SCGAN, get_data
 
 # Read in the data
 data, _, _ = get_data("../DataPreprocessing/GSE114727/")
@@ -10,9 +10,9 @@ data, _, _ = get_data("../DataPreprocessing/GSE114727/")
 gan = SCGAN(
     data = data,
     CHECKPOINT_PATH = "../models", 
-    LRATE = 0.0001,
-    EPOCHS = 5000, 
-    BATCH_SIZE = 100, 
+    LRATE = 0.00005,
+    EPOCHS = 1000, 
+    BATCH_SIZE = 32, 
     NOISE_DIM = 100, 
     SEED = 10,
     checkpoint_freq = 200,
