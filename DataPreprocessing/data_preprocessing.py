@@ -112,7 +112,6 @@ integrated_adata.obs = metadata
 ### Data processing ###
 print("[INFO] Commencing data pre-processing")
 
-
 # Basic filtering
 sc.pp.filter_cells(integrated_adata, min_genes=200)
 sc.pp.filter_genes(integrated_adata, min_cells=3)
@@ -142,26 +141,27 @@ integrated_adata.raw = integrated_adata
 integrated_adata = integrated_adata[:, integrated_adata.var.highly_variable]
 
 # Scale the data
-sc.pp.scale(integrated_adata)
+sc.pp.scale(integrated_adata, max_value = 1.0)
 
-### Checking data quality ###
-print("[INFO] Checking data quality")
+# ### Checking data quality ###
+# print("[INFO] Checking data quality")
 
-# Perform PCA
-sc.tl.pca(integrated_adata, svd_solver='arpack')
-sc.pl.pca(integrated_adata)
+# # Perform PCA
+# sc.tl.pca(integrated_adata, svd_solver='arpack')
+# sc.pl.pca(integrated_adata)
 
-# Identify the PCs contributing to the total variance
-sc.pl.pca_variance_ratio(integrated_adata, log=True)
+# # Identify the PCs contributing to the total variance
+# sc.pl.pca_variance_ratio(integrated_adata, log=True)
 
-# Carry out UMAP
-sc.pp.neighbors(integrated_adata, n_neighbors=10, n_pcs=40)
-sc.tl.umap(integrated_adata)
-sc.pl.umap(integrated_adata)
+# # Carry out UMAP
+# sc.pp.neighbors(integrated_adata, n_neighbors=10, n_pcs=40)
+# sc.tl.umap(integrated_adata)
+# sc.pl.umap(integrated_adata)
 
-# Layer the cell labels on the umap
-sc.pl.umap(integrated_adata, color='Celltype (major-lineage)')
+# # Layer the cell labels on the umap
+# sc.pl.umap(integrated_adata, color='Celltype (major-lineage)')
 
+### Export data ###
 print("[INFO] Exporting processed data")
 
 # Export data for model creation and evaluation

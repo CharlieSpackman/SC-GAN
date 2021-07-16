@@ -6,7 +6,7 @@ tf.compat.v1.logging.set_verbosity('ERROR')
 from tensorflow.python.framework.ops import disable_eager_execution
 disable_eager_execution()
 from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import LeakyReLU, Dense, BatchNormalization, Dropout, Input
+from tensorflow.keras.layers import LeakyReLU, Dense, BatchNormalization, Input
 from tensorflow.keras.optimizers import RMSprop
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
@@ -93,9 +93,10 @@ class SCGAN():
         LRATE = 0.00005,
         EPOCHS = 30000, 
         BATCH_SIZE = 32, 
-        NOISE_DIM = 100, 
-        SEED = 36,
+        NOISE_DIM = 100,
         DISC_UPDATES = 5,
+        GRAD_PEN = 10,
+        SEED = 36,
         checkpoint_freq = 200,
         eval_freq = 2000):
         
@@ -106,8 +107,11 @@ class SCGAN():
         self.EPOCHS = EPOCHS
         self.BATCH_SIZE = BATCH_SIZE
         self.NOISE_DIM = NOISE_DIM
-        self.SEED = SEED
         self.DISC_UPDATES = DISC_UPDATES
+        self.GRAD_PEN = GRAD_PEN
+        self.SEED = SEED
+
+        ### Define algorithm parameters ###
         self.checkpoint_freq = checkpoint_freq
         self.eval_freq = eval_freq
         self.NUM_FEATURES = self.data.shape[1]
@@ -166,7 +170,7 @@ class SCGAN():
             self.wasserstein_loss,
             partial_gp_loss],
             optimizer=self.optimizer,
-            loss_weights=[1, 1, 10],
+            loss_weights=[1, 1, self.GRAD_PEN],
             experimental_run_tf_function=False)
 
 
@@ -191,6 +195,9 @@ class SCGAN():
             discriminator=self.discriminator)
 
 
+        print("[INFO] Initialisation complete")
+
+
     ### Initiatilise the data ###
     def init_data(self):
 
@@ -200,7 +207,7 @@ class SCGAN():
         self.test_data_n = self.test_data.shape[0]
 
         ### Convert to the correct dtype ###
-        self.train_data = tf.convert_to_tensor(self.train_data.astype('float32'), dtype=tf.float32)
+        self.train_data = self.train_data.astype('float32')
         self.test_data = self.test_data.astype('float32')
 
         ### Create reduced validation sets ###
@@ -217,6 +224,8 @@ class SCGAN():
             p.joinpath("data").mkdir()
             p.joinpath("metrics").mkdir()
 
+    print("[INFO] Data initialisation complete")
+
 
     ### Define Network Architecture ###
     # Generator Network
@@ -225,19 +234,22 @@ class SCGAN():
         model = Sequential(name="Generator")
 
         # Layer 1
-        model.add(Dense(input_dim=self.NOISE_DIM, units=500, activation="relu"))
-        model.add(BatchNormalization(momentum=0.8))
+        model.add(Dense(input_dim=self.NOISE_DIM, units=500, kernel_initializer='he_normal'))
+        model.add(LeakyReLU(alpha=0.2))
+        # model.add(BatchNormalization(momentum=0.8))
 
-        # Layer 2
-        model.add(Dense(units=500, activation="relu"))
-        model.add(BatchNormalization(momentum=0.8))
+        # # Layer 2
+        # model.add(Dense(units=500, kernel_initializer='he_normal'))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(BatchNormalization(momentum=0.8))
 
-        # Layer 3
-        model.add(Dense(units=500, activation="relu"))
-        model.add(BatchNormalization(momentum=0.8))
+        # # Layer 3
+        # model.add(Dense(units=500, kernel_initializer='he_normal'))
+        # model.add(LeakyReLU(alpha=0.2))
+        # model.add(BatchNormalization(momentum=0.8))
 
         # Output Layer
-        model.add(Dense(units=self.NUM_FEATURES, activation="tanh"))
+        model.add(Dense(units=self.NUM_FEATURES, activation="tanh", kernel_initializer='he_normal'))
 
         noise = Input(shape=(self.NOISE_DIM,))
         img = model(noise)
@@ -250,24 +262,19 @@ class SCGAN():
         model = Sequential(name="Discriminator")
 
         # Layer 1
-        model.add(Dense(input_dim=self.NUM_FEATURES, units = 500))
+        model.add(Dense(input_dim=self.NUM_FEATURES, units = 500, kernel_initializer='he_normal'))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(rate = 0.25))
 
-        # Layer 2
-        model.add(Dense(units = 500))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(rate = 0.25))
+        # # Layer 2
+        # model.add(Dense(units = 500, kernel_initializer='he_normal'))
+        # model.add(LeakyReLU(alpha=0.2))
 
-        # Layer 3
-        model.add(Dense(units = 500))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(rate = 0.25))
+        # # Layer 3
+        # model.add(Dense(units = 500, kernel_initializer='he_normal'))
+        # model.add(LeakyReLU(alpha=0.2))
 
         # Output layer
-        model.add(Dense(1, activation = "linear"))
+        model.add(Dense(1, activation = None, kernel_initializer='he_normal'))
 
         img = Input(shape=self.NUM_FEATURES)
         validity = model(img)
@@ -312,7 +319,7 @@ Test set size = {self.test_data_n}
 
     ### Define loss functions ###
     def wasserstein_loss(self, y_true, y_pred):
-        return tf.keras.backend.mean(y_true * y_pred)
+        return tf.math.reduce_mean(y_true * y_pred)
 
     def gradient_penalty_loss(self, y_true, y_pred, averaged_samples):
         """
@@ -360,8 +367,8 @@ Test set size = {self.test_data_n}
             # Loop through each batch and update Discriminator
             for _ in range(self.DISC_UPDATES):
                 # Get a random set of batches
-                idx = np.random.randint(0, self.train_data_n, self.BATCH_SIZE).reshape(-1,1)
-                batch = tf.gather_nd(self.train_data, idx)
+                idx = np.random.randint(0, self.train_data_n, self.BATCH_SIZE)
+                batch = self.train_data[idx]
 
                 # Create random noise and generate samples
                 noise = tf.random.normal([self.BATCH_SIZE, self.NOISE_DIM])
@@ -380,8 +387,8 @@ Test set size = {self.test_data_n}
 
             print('completed in {} seconds [G {}] [D {}]'.format(
                 round(time.time()-epoch_start, 2), 
-                round(1 - gen_loss, 6),
-                round(1 - disc_loss[0], 6)))
+                round(gen_loss, 6),
+                round(disc_loss[0], 6)))
 
             # Save the model at the specified frequency
             if (epoch + 1) % self.checkpoint_freq == 0:
