@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import directed_hausdorff
+from scipy.interpolate import make_interp_spline
 
 # Import dimensionality reduction modules
 from sklearn.decomposition import PCA
@@ -125,32 +126,23 @@ class WGANGP():
 
         print("[INFO] Reading data")
 
-        # Load the dataset
-        data = pd.read_csv(_get_path("../DataPreprocessing/GSE114727/GSE114727_processed_data.csv"), delimiter=",")        
-        data = data.iloc[:, 1:].to_numpy()
-        
-        # Reduce data
-        data_PCA = _rescale_arr(PCA(n_components=2).fit_transform(data))
-        data_TSNE = _rescale_arr(TSNE(n_components=2).fit_transform(data))
-        data_UMAP = _rescale_arr(UMAP(n_components=2).fit_transform(data))
+        # # Load the dataset
+        data = pd.read_csv(_get_path("../DataPreprocessing/GSE114725/GSE114725_processed_data.csv"), delimiter=",", index_col="cellid")        
+        data = data.values
+
+        data = MinMaxScaler(feature_range = (-1,1)).fit_transform(data)
 
         # Split data into training and test sets
-        self.X_train, self.X_test, \
-            _, self.val_PCA, \
-            _, self.val_TSNE, \
-            _, self.val_UMAP = train_test_split(
-                data, 
-                data_PCA, 
-                data_TSNE, 
-                data_UMAP, 
-                train_size = 0.8, 
-                random_state = self.seed) 
+        self.X_train, self.X_test = train_test_split(
+            data,
+            train_size = 0.8, 
+            random_state = self.seed) 
 
         self.X_train_n = self.X_train.shape[0]
         self.X_test_n = self.X_test.shape[0]
         self.n_features = data.shape[1]
 
-        # Create reduced validation sets
+        # Create validation labels and placeholders for metrics
         self.val_labels = np.concatenate(
             (np.zeros(shape=(self.X_test_n,)), 
             np.ones(shape=(self.X_test_n, ))), 
@@ -231,6 +223,7 @@ class WGANGP():
         #-------------------------------
         # Construct Computational Graph
         # for the Generator
+
         #-------------------------------
 
         # For the generator we freeze the discriminator's layers
@@ -442,28 +435,25 @@ class WGANGP():
         noise = noise = np.random.normal(0, 1, size = (self.X_test_n, self.noise_dim))
         generated_samples = self.generator.predict(noise, steps=1)
 
-        # Reduce the dataset with PCA
-        noise_PCA = _rescale_arr(PCA(n_components=2).fit_transform(generated_samples))
-        # Combine and rescale data
-        combined_PCA = np.concatenate((self.val_PCA, noise_PCA), axis = 0)
+        # Join generated samples with test set
+        combined = np.concatenate((self.X_test, generated_samples), axis = 0)
+
+        # Reduce and scale the dataset with PCA 
+        combined_PCA = _rescale_arr(PCA(n_components=2).fit_transform(combined))
         # Calculate the correlation between samples
         hausdorff_dist_PCA = hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
-        # Reduce the dataset with TSNE
-        noise_TSNE = _rescale_arr(TSNE(n_components=2).fit_transform(generated_samples))
-        # Combine and rescale data
-        combined_TSNE = np.concatenate((self.val_TSNE, noise_TSNE), axis = 0)
+        # Reduce and scale the dataset with TSNE 
+        combined_TSNE = _rescale_arr(TSNE(n_components=2).fit_transform(combined))
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
 
-        # Reduce the dataset with UMAP
-        noise_UMAP = _rescale_arr(UMAP(n_components=2).fit_transform(generated_samples))
-        # Combine and rescale data
-        combined_UMAP = np.concatenate((self.val_UMAP, noise_UMAP), axis = 0)
+        # Reduce and scale the dataset with UMAP 
+        combined_UMAP = _rescale_arr(UMAP(n_components=2).fit_transform(combined))
         # Calculate the correlation between samples
         hausdorff_dist_UMAP = hausdorff_dist(combined_UMAP[self.val_labels==0], combined_UMAP[self.val_labels==1])
-        
-        # Save distances
+
+        # Append distances to distance object
         self.hausdorff_dist.append([epoch+1, hausdorff_dist_PCA, hausdorff_dist_TSNE, hausdorff_dist_UMAP])
 
         # Visualise the validation set
@@ -472,7 +462,7 @@ class WGANGP():
 
         # PCA plot
         axs[0].scatter(combined_PCA[self.val_labels==0, 0], combined_PCA[self.val_labels==0, 1], c = red, s = point_size)
-        axs[0].scatter(combined_PCA[self.val_labels==1, 0], combined_PCA[self.val_labels==1, 1], c = blue, s = point_size)
+        axs[0].scatter(combined_PCA[self.val_labels==1, 0], combined_PCA[self.val_labels==1, 1], c = blue, s = point_size-4)
         axs[0].title.set_text(f"PCA - Hausdorff dist: {round(hausdorff_dist_PCA,2)}")
         axs[0].set_xlabel("PC 1")
         axs[0].set_ylabel("PC 2")
@@ -481,7 +471,7 @@ class WGANGP():
 
         # t-SNE plot
         axs[1].scatter(combined_TSNE[self.val_labels==0, 0], combined_TSNE[self.val_labels==0, 1], label = "Real", c = red, s = point_size)
-        axs[1].scatter(combined_TSNE[self.val_labels==1, 0], combined_TSNE[self.val_labels==1, 1], label = "Generated", c = blue, s = point_size)
+        axs[1].scatter(combined_TSNE[self.val_labels==1, 0], combined_TSNE[self.val_labels==1, 1], label = "Generated", c = blue, s = point_size-4)
         axs[1].title.set_text(f"t-SNE - Hausdorff dist: {round(hausdorff_dist_TSNE,2)}")
         axs[1].set_xlabel("t-SNE 1")
         axs[1].set_ylabel("t-SNE 2")
@@ -490,7 +480,7 @@ class WGANGP():
 
         # UMAP plot
         axs[2].scatter(combined_UMAP[self.val_labels==0, 0], combined_UMAP[self.val_labels==0, 1], c = red, s = point_size)
-        axs[2].scatter(combined_UMAP[self.val_labels==1, 0], combined_UMAP[self.val_labels==1, 1], c = blue, s = point_size)
+        axs[2].scatter(combined_UMAP[self.val_labels==1, 0], combined_UMAP[self.val_labels==1, 1], c = blue, s = point_size-4)
         axs[2].title.set_text(f"UMAP - Hausdorff dist: {round(hausdorff_dist_UMAP,2)}")
         axs[2].set_xlabel("UMAP 1")
         axs[2].set_ylabel("UMAP 2")
@@ -503,6 +493,16 @@ class WGANGP():
 
 
     def produce_loss_graph(self):
+
+        def interpolate(epochs, data):
+
+            epochs_new = np.linspace(1, epochs.iloc[-1], epochs.shape[0]*100)
+            new_line = make_interp_spline(epochs, data)
+            data_new = new_line(epochs_new)
+
+            return pd.Series(epochs_new), pd.Series(data_new)
+
+        print("[INFO] producing loss graphs...", end =  "")
 
         # Model losses
         # Convert list of lists into a numpy arrays
@@ -518,12 +518,32 @@ class WGANGP():
         # Save losses as csv
         combined_losses.to_csv(_get_path(f"{self.ckpt_path}/{self.file_name}/data/losses.csv"), index=False)
 
+        # Create training loss graph
+        fig, ax = plt.subplots(1, 1, figsize=(axis_size*3, axis_size), squeeze=True)
+        ax.plot(gen_losses, linewidth = line_width)
+        ax.plot(disc_losses, linewidth = line_width)
+        ax.set_ylabel('Wasserstein-1 Distance')
+        ax.set_xlabel('Epoch')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
+
+        fig.legend(['Generator Loss', 'Discriminator Loss'], loc='lower center', frameon = False, ncol=2)
+
+        fig.savefig(fname=_get_path(f"{self.ckpt_path}/{self.file_name}/images/losses_plot.png"))
+        plt.clf()
+
+
         # Distances
         # Convert list of lists into a numpy arrays
-        epochs = pd.Series([loss[0] for loss in self.hausdorff_dist])
-        PCA_losses = pd.Series([loss[1] for loss in self.hausdorff_dist])
-        TSNE_losses = pd.Series([loss[2] for loss in self.hausdorff_dist])
-        UMAP_losses = pd.Series([loss[3] for loss in self.hausdorff_dist])
+        epochs = pd.Series([loss[0] for loss in self.hausdorff_dist], dtype=np.float32)
+        PCA_losses = pd.Series([loss[1] for loss in self.hausdorff_dist], dtype=np.float32)
+        TSNE_losses = pd.Series([loss[2] for loss in self.hausdorff_dist], dtype=np.float32)
+        UMAP_losses = pd.Series([loss[3] for loss in self.hausdorff_dist], dtype=np.float32)
+
+        # Interpolate the data to ensure a smooth graph
+        _, PCA_losses = interpolate(epochs, PCA_losses)
+        _, TSNE_losses = interpolate(epochs, TSNE_losses)
+        epochs, UMAP_losses = interpolate(epochs, UMAP_losses)
 
         # Combine losses in a dataframe
         distance_losses = pd.DataFrame(
@@ -533,22 +553,26 @@ class WGANGP():
             "umap_loss": UMAP_losses}
             )
 
-        # Save losses as csv
+        # Save distances as csv
         distance_losses.to_csv(_get_path(f"{self.ckpt_path}/{self.file_name}/data/distance_losses.csv"), index=False)
 
-        # Create training loss graph
+        # Create distances graph
         fig, ax = plt.subplots(1, 1, figsize=(axis_size*3, axis_size), squeeze=True)
-        ax.plot(gen_losses, linewidth = line_width)
-        ax.plot(disc_losses, linewidth = line_width)
-        ax.set_ylabel('Validation Loss')
+        ax.plot(epochs, PCA_losses, linewidth = line_width)
+        ax.plot(epochs, TSNE_losses, linewidth = line_width)
+        ax.plot(epochs, UMAP_losses, linewidth = line_width)
+        ax.set_ylabel('Hausdorff Distance')
         ax.set_xlabel('Epoch')
+        ax.set_ylim(ymin = 0.0)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
-        fig.legend(['Generator Loss', 'Discriminator Loss'], loc='lower center', frameon = False, ncol=2)
+        fig.legend(['PCA', 't-SNE', 'UMAP'], loc='lower center', frameon = False, ncol=3)
 
-        fig.savefig(fname=_get_path(f"{self.ckpt_path}/{self.file_name}/images/losses_plot.png"))
+        fig.savefig(fname=_get_path(f"{self.ckpt_path}/{self.file_name}/images/distances_plot.png"))
         plt.clf()
+
+        print("done!")
 
         return None
 
@@ -569,6 +593,8 @@ class WGANGP():
 
     # Define a function to print model summaries
     def get_model_summaries(self):
+
+        print("[INFO] Printing Model Summaries\n")
 
         print(self.generator.summary(), end = "\n\n")
         print(self.discriminator.summary(), end = "\n\n")
@@ -606,7 +632,7 @@ Test set size = {self.X_test_n}
 
 if __name__ == '__main__':
     gan = WGANGP(
-        lrate = 0.00005,
+        lrate = 0.00001,
         epochs = 30000,
         batch_size = 64,
         noise_dim = 100,

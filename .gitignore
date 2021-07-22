@@ -1,7 +1,12 @@
 DataPreprocessing/GSE114727/
+DataPreprocessing/GSE114725/
 DataPreprocessing/cache/
+DataPreprocessing/archive/
+
 models/
+
 ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
+
 .vscode/
 **/*.csv
 **/*.h5ad
@@ -13,6 +18,5 @@ ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
 **/*.bat
 **/*.png
 **/*.ipynb
-ModelCreation/github_gan.py
-ModelCreation/Adam_prediction.py
-ModelCreation/TFGAN_test.py
+
+ModelCreation/archive
