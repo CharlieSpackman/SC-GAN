@@ -130,7 +130,8 @@ class WGANGP():
         data = pd.read_csv(_get_path("../DataPreprocessing/GSE114725/GSE114725_processed_data.csv"), delimiter=",", index_col="cellid")        
         data = data.values
 
-        data = MinMaxScaler(feature_range = (-1,1)).fit_transform(data)
+        # Scale data
+        data = MinMaxScaler(feature_range=(-1,1)).fit_transform(data)
 
         # Split data into training and test sets
         self.X_train, self.X_test = train_test_split(
@@ -223,7 +224,6 @@ class WGANGP():
         #-------------------------------
         # Construct Computational Graph
         # for the Generator
-
         #-------------------------------
 
         # For the generator we freeze the discriminator's layers
@@ -289,7 +289,7 @@ class WGANGP():
 
         # Layer 2
         model.add(Dense(
-            units=500, 
+            units=1000, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(BatchNormalization(momentum=0.8))
@@ -297,7 +297,7 @@ class WGANGP():
         
         # Layer 3
         model.add(Dense(
-            units=500, 
+            units=1500, 
             kernel_initializer='he_normal',
             name = "Layer_3"))
         model.add(BatchNormalization(momentum=0.8))
@@ -323,7 +323,7 @@ class WGANGP():
         # Layer 1
         model.add(Dense(
             input_dim=self.n_features, 
-            units = 500, 
+            units = 1500, 
             kernel_initializer='he_normal',
             name = "Layer_1"))
         model.add(LeakyReLU(alpha=0.2))
@@ -331,7 +331,7 @@ class WGANGP():
 
         # Layer 2
         model.add(Dense(
-            units = 500, 
+            units = 1000, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
@@ -439,12 +439,17 @@ class WGANGP():
         combined = np.concatenate((self.X_test, generated_samples), axis = 0)
 
         # Reduce and scale the dataset with PCA 
-        combined_PCA = _rescale_arr(PCA(n_components=2).fit_transform(combined))
+        combined_PCA = _rescale_arr(PCA(n_components=2, svd_solver="arpack").fit_transform(combined))
         # Calculate the correlation between samples
         hausdorff_dist_PCA = hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
-        # Reduce and scale the dataset with TSNE 
-        combined_TSNE = _rescale_arr(TSNE(n_components=2).fit_transform(combined))
+        # Reduce and scale the dataset with TSNE
+        combined_TSNE = TSNE(
+            n_components=2, 
+            perplexity=10.0,
+            learning_rate=100.0,
+            init = "pca") 
+        combined_TSNE = _rescale_arr(combined_TSNE.fit_transform(combined))
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
 
@@ -596,8 +601,23 @@ class WGANGP():
 
         print("[INFO] Printing Model Summaries\n")
 
-        print(self.generator.summary(), end = "\n\n")
-        print(self.discriminator.summary(), end = "\n\n")
+        print(self.generator.layers[1].summary(), end = "\n\n")
+        print(self.discriminator.layers[1].summary(), end = "\n\n")
+
+        gen, disc = [], []
+
+        self.generator.layers[1].summary(print_fn=lambda x: gen.append(x))
+        self.discriminator.layers[1].summary(print_fn=lambda x: gen.append(x))
+
+        with open(_get_path(f"{self.ckpt_path}/{self.file_name}/model_summaries.txt"), "w") as f:
+
+            for item in gen:
+                f.write(f"{item}\n")
+
+            f.write("\n")
+
+            for item in disc:
+                f.write(f"{item}\n")
 
         return None
 
@@ -627,20 +647,24 @@ Test set size = {self.X_test_n}
 
         print(parameters)
 
+        with open(_get_path(f"{self.ckpt_path}/{self.file_name}/model_params.txt"), "w") as f:
+
+            f.write(parameters)
+
         return None
 
 
 if __name__ == '__main__':
     gan = WGANGP(
-        lrate = 0.00001,
+        lrate = 0.00005,
         epochs = 30000,
-        batch_size = 64,
+        batch_size = 32,
         noise_dim = 100,
         disc_updates = 5,
         grad_pen = 10,
-        seed = 10,
+        seed = 1,
         ckpt_path="../models",
-        ckpt_freq=500,
+        ckpt_freq=1000,
         eval_freq=2000
     )
 
