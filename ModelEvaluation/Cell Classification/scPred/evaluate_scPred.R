@@ -13,8 +13,8 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL = "0.001_0.001_100_250_100_30" # UPDATE AS REQUIRED
-EPOCH = "00100" # UPDATE AS REQUIRED
+MODEL = "5e-05_50000_64_100_205" # UPDATE AS REQUIRED
+EPOCH = "160000" # UPDATE AS REQUIRED
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
     MODEL,
@@ -24,10 +24,10 @@ gan_data_path = paste(
     sep = "")
 
 # Get file paths for the baseline data
-baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114727/GSE114727_processed_data.csv"
+baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_data_10000_2000.csv"
 
 # Get the annotations
-anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114727/GSE114727_processed_annotations.csv"
+anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_2000.csv"
 
 # Define a function to create the Seurat object
 scPred <- function(data, anno) {
@@ -61,7 +61,7 @@ scPred <- function(data, anno) {
   train_data_S <- RunUMAP(train_data_S, dims = 1:30)
   
   # Get Feature Space
-  train_data_S <- getFeatureSpace(train_data_S, "Celltype..major.lineage.")
+  train_data_S <- getFeatureSpace(train_data_S, "Macro.Cell.Type")
   
   # Train the classifier
   train_data_S <- trainModel(train_data_S)
@@ -71,7 +71,7 @@ scPred <- function(data, anno) {
   predictions <- test_data_S@meta.data$scpred_prediction
   
   # Get labels
-  labels <- test_data_S@meta.data$Celltype..major.lineage.
+  labels <- test_data_S@meta.data$Macro.Cell.Type
   
   # Create dataframe
   output <- data.frame(predictions, labels)
@@ -86,7 +86,6 @@ anno <- read.csv(anno_path)
 ### GAN evaluation ### 
 # Read in GAN reduced data
 gan_reduced_data <- read.csv(gan_data_path)
-gan_reduced_data <- gan_reduced_data[, 2:ncol(gan_reduced_data)]
 
 # Get predictions for GAN reduced data
 gan_predictions = scPred(gan_reduced_data, anno)

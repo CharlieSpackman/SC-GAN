@@ -6,8 +6,8 @@ from sklearn import metrics
 import matplotlib.pyplot as plt
 
 # Evaluation parameters
-MODEL_NAME = "0.001_0.001_100_250_100_30" # UPDATE AS NEEDED
-EPOCH = 100 # UPDATE AS NEEDED
+MODEL_NAME = "5e-05_50000_64_100_205" ### Update this as required
+EPOCH = 160000 ### Update this as required
 
 # Paths for reduced data
 MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models\\"
@@ -36,12 +36,17 @@ def compute_metrics(data, axes, ax_title):
     y_pred = data["predictions"]
 
     class_labels = [
-        "CD4Tconv",
-        "CD8T",
-        "CD8Tex",
-        "Tprolif",
-        "Treg"
-    ]
+        "B",
+        "MACROPHAGE",
+        "MAST",
+        "NEUTROPHIL",
+        "NK",
+        "NKT",
+        "T",
+        "mDC",
+        "pDC"
+        ]
+
 
     # Compute accuracy
     accuracy = metrics.accuracy_score(y_true, y_pred)

@@ -13,13 +13,11 @@ import time
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LeakyReLU, Dense, BatchNormalization, Input, Dropout
-from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.optimizers import Adam
 from tensorflow.python.framework.ops import disable_eager_execution
 
 # Set Tensorflow settings
 tf.compat.v1.logging.set_verbosity('ERROR')
-disable_eager_execution()
-tf.compat.v1.experimental.output_all_intermediates(True)
 
 # Import data processing modules
 import numpy as np
@@ -32,7 +30,7 @@ from scipy.interpolate import make_interp_spline
 
 # Import dimensionality reduction modules
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
+from MulticoreTSNE import MulticoreTSNE as TSNE
 from umap import UMAP
 
 # Set matplotlib settings
@@ -90,16 +88,18 @@ class WGANGP():
 
     def __init__(
         self, 
-        lrate = 0.00005,
-        epochs = 30000, 
-        batch_size = 64, 
+        lrate = 0.00001,
+        epochs = 100000, 
+        batch_size = 32, 
         noise_dim = 100,
         disc_updates = 5,
         grad_pen = 10,
-        seed = 36,
-        ckpt_freq = 200,
+        feature_range = (0,1),
+        seed = 2,
+        data_path = _get_path("../DataPreprocessing/GSE114725"),
+        ckpt_freq = 2000,
         ckpt_path = _get_path("../models"),
-        eval_freq = 2000):
+        eval_freq = 5000):
         
         # Define model parameters
         self.lrate = lrate
@@ -108,9 +108,11 @@ class WGANGP():
         self.noise_dim = noise_dim
         self.disc_updates = disc_updates
         self.grad_pen = grad_pen
+        self.feature_range = feature_range
 
         # Define algorithm parameters
         self.seed = seed
+        self.data_path = data_path
         self.ckpt_freq = ckpt_freq
         self.ckpt_path = ckpt_path
         self.eval_freq = eval_freq
@@ -122,20 +124,27 @@ class WGANGP():
             self.seed)
 
 
-    def init_data(self):
+    def init_data(self, data_fname, anno_fname):
 
         print("[INFO] Reading data")
 
-        # # Load the dataset
-        data = pd.read_csv(_get_path("../DataPreprocessing/GSE114725/GSE114725_processed_data.csv"), delimiter=",", index_col="cellid")        
+        # Load the dataset
+        data = pd.read_csv(_get_path(f"{self.data_path}/{data_fname}"), delimiter=",", index_col="cellid")        
         data = data.values
 
         # Scale data
-        data = MinMaxScaler(feature_range=(-1,1)).fit_transform(data)
+        data = MinMaxScaler(feature_range=self.feature_range).fit_transform(data)
+
+        # Load the annotations
+        anno = pd.read_csv(_get_path(f"{self.data_path}/{anno_fname}"), delimiter=",", index_col="cellid")
+
+        # Get the cell labels
+        labels = anno['Macro Cell Type'].to_numpy()
 
         # Split data into training and test sets
-        self.X_train, self.X_test = train_test_split(
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
             data,
+            labels,
             train_size = 0.8, 
             random_state = self.seed) 
 
@@ -162,7 +171,8 @@ class WGANGP():
 
         print("[INFO] Data successfully read")
 
-        return None
+        return self.X_train, self.X_test, self.y_train, self.y_test
+
 
     def init_networks(self):
 
@@ -170,7 +180,7 @@ class WGANGP():
 
 
         # Define the Optimizer
-        self.optimizer = RMSprop(learning_rate=self.lrate)
+        self.optimizer = Adam(learning_rate=self.lrate, beta_1=0.9, beta_2=0.999)
 
         # Build the generator and critic
         self.generator = self._build_generator()
@@ -281,27 +291,43 @@ class WGANGP():
         # Layer 1
         model.add(Dense(
             input_dim=self.noise_dim, 
-            units=500, 
+            units=600, 
             kernel_initializer='he_normal',
             name = "Layer_1"))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
 
         # Layer 2
         model.add(Dense(
-            units=1000, 
+            units=600, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
-        model.add(BatchNormalization(momentum=0.8))
+        # model.add(BatchNormalization(momentum=0.8))
         model.add(LeakyReLU(alpha=0.2))
         
-        # Layer 3
-        model.add(Dense(
-            units=1500, 
-            kernel_initializer='he_normal',
-            name = "Layer_3"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(LeakyReLU(alpha=0.2))
+        # # Layer 3
+        # model.add(Dense(
+        #     units=500, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_3"))
+        # # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
+
+        # # Layer 4
+        # model.add(Dense(
+        #     units=500, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_4"))
+        # # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
+
+        # # Layer 5
+        # model.add(Dense(
+        #     units=500, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_5"))
+        # # model.add(BatchNormalization(momentum=0.8))
+        # model.add(LeakyReLU(alpha=0.2))
 
         # Output Layer
         model.add(Dense(
@@ -323,32 +349,46 @@ class WGANGP():
         # Layer 1
         model.add(Dense(
             input_dim=self.n_features, 
-            units = 1500, 
+            units = 200, 
             kernel_initializer='he_normal',
             name = "Layer_1"))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        # model.add(Dropout(0.25))
 
         # Layer 2
         model.add(Dense(
-            units = 1000, 
+            units = 200, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.25))
+        # # model.add(Dropout(0.25))
 
-        # Layer 3
-        model.add(Dense(
-            units = 500, 
-            kernel_initializer='he_normal',
-            name = "Layer_3"))
-        model.add(LeakyReLU(alpha=0.2))
+        # # Layer 3
+        # model.add(Dense(
+        #     units = 200, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_3"))
+        # model.add(LeakyReLU(alpha=0.2))
+
+        # # Layer 4
+        # model.add(Dense(
+        #     units = 200, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_4"))
+        # model.add(LeakyReLU(alpha=0.2))
+
+        # # Layer 5
+        # model.add(Dense(
+        #     units = 200, 
+        #     kernel_initializer='he_normal',
+        #     name = "Layer_5"))
+        # model.add(LeakyReLU(alpha=0.2))
 
         # Output layer
         model.add(Dense(units = 1, 
-        activation = None, 
-        kernel_initializer='he_normal',
-        name = "Output_layer"))
+            activation = None, 
+            kernel_initializer='he_normal',
+            name = "Output_layer"))
 
         sample = Input(shape=self.n_features)
         validity = model(sample)
@@ -439,22 +479,18 @@ class WGANGP():
         combined = np.concatenate((self.X_test, generated_samples), axis = 0)
 
         # Reduce and scale the dataset with PCA 
-        combined_PCA = _rescale_arr(PCA(n_components=2, svd_solver="arpack").fit_transform(combined))
+        combined_PCA = _rescale_arr(PCA(n_components=2).fit_transform(combined))
+        pcs = PCA(n_components=50).fit_transform(combined)
         # Calculate the correlation between samples
         hausdorff_dist_PCA = hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
         # Reduce and scale the dataset with TSNE
-        combined_TSNE = TSNE(
-            n_components=2, 
-            perplexity=10.0,
-            learning_rate=100.0,
-            init = "pca") 
-        combined_TSNE = _rescale_arr(combined_TSNE.fit_transform(combined))
+        combined_TSNE = _rescale_arr(TSNE(n_components=2).fit_transform(pcs))
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
 
         # Reduce and scale the dataset with UMAP 
-        combined_UMAP = _rescale_arr(UMAP(n_components=2).fit_transform(combined))
+        combined_UMAP = _rescale_arr(UMAP(n_components=2).fit_transform(pcs))
         # Calculate the correlation between samples
         hausdorff_dist_UMAP = hausdorff_dist(combined_UMAP[self.val_labels==0], combined_UMAP[self.val_labels==1])
 
@@ -639,6 +675,9 @@ Learning rate = {self.lrate}
 Epochs = {self.epochs}
 Batch size = {self.batch_size}
 Noise size = {self.noise_dim}
+Discriminator updates = {self.disc_updates}
+Gradient Penality = {self.grad_pen}
+Feature Range = {self.feature_range}
 Seed = {self.seed}
 Number of features {self.n_features}
 Training set size = {self.X_train_n}
@@ -655,21 +694,27 @@ Test set size = {self.X_test_n}
 
 
 if __name__ == '__main__':
+
+    disable_eager_execution()
+    tf.compat.v1.experimental.output_all_intermediates(True)
+
     gan = WGANGP(
         lrate = 0.00005,
-        epochs = 30000,
-        batch_size = 32,
+        epochs = 500000,
+        batch_size = 64,
         noise_dim = 100,
         disc_updates = 5,
         grad_pen = 10,
-        seed = 1,
+        feature_range=(0,1),
+        seed = 301,
+        data_path = "../DataPreprocessing/GSE114725",
         ckpt_path="../models",
-        ckpt_freq=1000,
-        eval_freq=2000
+        ckpt_freq = 2000,
+        eval_freq = 5000
     )
 
     # Initialise data and networks
-    gan.init_data()
+    gan.init_data(data_fname = "GSE114725_processed_data_10000_3912.csv", anno_fname = "GSE114725_processed_annotations_10000_3912.csv")
     gan.init_networks()
 
     # Get summaries of model and parameters
