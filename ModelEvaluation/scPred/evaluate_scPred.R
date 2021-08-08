@@ -13,8 +13,9 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL = "5e-05_50000_64_100_205" # UPDATE AS REQUIRED
-EPOCH = "160000" # UPDATE AS REQUIRED
+MODEL = "5e-05_300000_64_100_302" ### Update this as required
+EPOCH = 270000 ### Update this as required
+
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
     MODEL,
@@ -24,10 +25,10 @@ gan_data_path = paste(
     sep = "")
 
 # Get file paths for the baseline data
-baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_data_10000_2000.csv"
+baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_data_10000_3912.csv"
 
 # Get the annotations
-anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_2000.csv"
+anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_3912.csv"
 
 # Define a function to create the Seurat object
 scPred <- function(data, anno) {

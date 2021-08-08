@@ -5,28 +5,37 @@ import pandas as pd
 from sklearn import metrics
 import matplotlib.pyplot as plt
 
+# Set matplotlib settings
+SMALL_SIZE = 14
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
+plt.rc('font', size=SMALL_SIZE)        
+plt.rc('axes', titlesize=MEDIUM_SIZE)   
+plt.rc('axes', labelsize=MEDIUM_SIZE)  
+plt.rc('xtick', labelsize=SMALL_SIZE)  
+plt.rc('ytick', labelsize=SMALL_SIZE)  
+plt.rc('legend', fontsize=MEDIUM_SIZE)  
+plt.rc('figure', titlesize=BIGGER_SIZE)
+
 # Evaluation parameters
-MODEL_NAME = "5e-05_50000_64_100_205" ### Update this as required
-EPOCH = 160000 ### Update this as required
+MODEL_NAME = "5e-05_300000_64_100_302" ### Update this as required
+EPOCH = 270000 ### Update this as required
 
 # Paths for reduced data
-MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models\\"
+MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models"
 METRICS_PATH = f"{MODEL_PATH}\\{MODEL_NAME}\\metrics\\"
 
 print("[INFO] Reading data")
-# Read in predictions and labels for moana
-moana_gan_reduced = pd.read_csv(METRICS_PATH + f"moana_reduced_gan_predictions_{EPOCH:05d}.csv")
-moana_baseline = pd.read_csv(METRICS_PATH + f"moana_baseline_predictions_{EPOCH:05d}.csv")
-
 # Read in predictions and labels for scPred
 scPred_gan_reduced = pd.read_csv(METRICS_PATH + f"scPred_reduced_gan_predictions_{EPOCH:05d}.csv")
 scPred_baseline = pd.read_csv(METRICS_PATH + f"scPred_baseline_predictions_{EPOCH:05d}.csv")
 
 
-# Create plots for Moana and scPred
+# Create plots for scPred
 axis_size = 8.0
-plot_ratios = {'height_ratios': [1,1], 'width_ratios': [1,1]}
-fig, axes = plt.subplots(2, 2, figsize=(axis_size*2, axis_size*2), gridspec_kw=plot_ratios, squeeze=True)
+plot_ratios = {'height_ratios': [1], 'width_ratios': [1,1]}
+fig, axes = plt.subplots(1, 2, figsize=(axis_size*3, axis_size*2), gridspec_kw=plot_ratios, squeeze=True)
+plt.xticks(rotation=90)
 
 # Define a function to compute performance metrics for each dataset
 def compute_metrics(data, axes, ax_title):
@@ -68,33 +77,35 @@ def compute_metrics(data, axes, ax_title):
     })
 
     # Get the confusion matrix plot
-    ax = metrics.ConfusionMatrixDisplay(cm, display_labels = class_labels).plot(ax=axes, colorbar=False).ax_
+    ax = metrics.ConfusionMatrixDisplay(cm, display_labels = class_labels).plot(ax=axes, colorbar=False, cmap = "YlGn").ax_
     ax.set_title(ax_title)
+    ax.set_xticklabels(class_labels, rotation=90, ha='right')
+
 
     return metrics_arr, ax
 
 print("[INFO] Computing metrics")
 # Get the metrics and plots for the datasets
-moana_gan_reduced_metrics, moana_gan_reduced_plot = compute_metrics(moana_gan_reduced, axes[0,0], "Moana: GAN Reduced")
-moana_baseline_metrics, moana_baseline_plot = compute_metrics(moana_baseline, axes[0,1], "Moana: Baseline")
-scPred_gan_reduced_metrics, scPred_gan_reduced_plot = compute_metrics(scPred_gan_reduced, axes[1,0], "scPred: GAN Reduced")
-scPred_baseline_metrics, scPred_baseline_plot = compute_metrics(scPred_baseline, axes[1,1], "scPred: Baseline")
+scPred_gan_reduced_metrics, scPred_gan_reduced_plot = compute_metrics(scPred_gan_reduced, axes[0], "scPred: GAN Reduced")
+scPred_baseline_metrics, scPred_baseline_plot = compute_metrics(scPred_baseline, axes[1], "scPred: Baseline")
+
+box = scPred_gan_reduced_plot.get_position()
+scPred_gan_reduced_plot.set_position([box.x0 - box.width * 0.05, box.y0, box.width * 0.9, box.height])
+
+box = scPred_baseline_plot.get_position()
+scPred_baseline_plot.set_position([box.x0, box.y0, box.width * 0.9, box.height])
 
 # Save plot
 plt.savefig(f"{MODEL_PATH}\\{MODEL_NAME}\\images\\confusion_matrices_{EPOCH:05d}.png")
 
 # Create a dataframe with all metrics
 col_names = [
-    "moana_gan_reduced",
-    "moana_baseline",
     "scPred_gan_reduced",
     "scPred_baseline"
 ]
 
 metrics_arr = pd.concat(
-    [moana_gan_reduced_metrics,
-    moana_baseline_metrics,
-    scPred_gan_reduced_metrics,
+    [scPred_gan_reduced_metrics,
     scPred_baseline_metrics],
     axis = 1)
 

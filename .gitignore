@@ -5,8 +5,7 @@ DataPreprocessing/archive/
 
 models/
 
-ModelEvaluation/Dimensionality Reduction/pyDRMetrics/
-ModelEvaluation/Dimensionality Reduction/archive/
+ModelEvaluation/archive
 
 .vscode/
 **/*.csv
