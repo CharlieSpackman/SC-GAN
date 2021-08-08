@@ -195,9 +195,9 @@ class WGANGP():
         training set 
     X_test : array
         validation set
-    y_train
+    y_train : array
         training labels
-    y_test
+    y_test : array
         validation labels
     X_train_n : int
         number of samples in the training set
@@ -213,15 +213,15 @@ class WGANGP():
         training losses, updated per epoch
     hausdorff_dist : list
         evaluation metric, updated once per evaluation frequency
-    optimizer : tf.Optimizer
+    optimizer : tf.keras.Optimizer
         optimizer object used during training
-    generator : tf.Sequential
+    generator : tf.keras.Sequential
         neural network model for the Generator
-    discriminator : tf.Sequential
+    discriminator : tf.keras.Sequential
         neural network model for the Discriminator
-    generator_model : tf.Model
+    generator_model : tf.keras.Model
         combined model for the Generator with input (used internally, not by the user)
-    discriminator_model : tf.Model
+    discriminator_model : tf.keras.Model
         combined model for the Discriminator with input (userd internally, not by the user)
     
 
@@ -233,8 +233,6 @@ class WGANGP():
         creates network objects.
     _gradient_pentality_loss(y_true, y_pred, averaged_samples):
         calculates the gradient penality loss term.
-    info(additional=""):
-        prints the person's name and age.
     _wasserstein_loss(y_true, y_pred):
         calculates the Earth-Mover distance
     _hausdorff_distance(real_sample, gen_sample):
@@ -253,6 +251,10 @@ class WGANGP():
         produces the Hausdorff distance and Wasserstein loss graphs
     produce_similarity_graph():
         produces a similarity graph of a sample of real and generated cells
+    evaluate_dimensionality_reduction():
+        evaluates the Discriminator's ability to reduce data
+    reduce_all_data():
+        runs all data through the Discriminator network and outputs the values at the final hidden layer
     _create_checkpoint(epoch):
         saves the model parameters when called
     get_model_summaries():
@@ -1185,7 +1187,7 @@ class WGANGP():
     # Define a function to print model summaries
     def get_model_summaries(self):
         """
-        Creates a .txt file with the Generator and Discriminator model summaries
+        Creates a .txt file with the Generator and Discriminator model summaries.
         """
 
         print("[INFO] Printing Model Summaries\n")
@@ -1213,7 +1215,7 @@ class WGANGP():
     # Define a functon to get the models
     def get_models(self):
         """
-        Returns the Generator and Discriminator objects
+        Returns the Generator and Discriminator objects.
         """
 
         return self.generator, self.discriminator
@@ -1291,3 +1293,9 @@ if __name__ == '__main__':
     # Evaluate the GAN
     gan.produce_similarity_graph()
     gan.produce_loss_graph()
+
+    # Evaluate Dimensionality Reduction
+    gan.evaluate_dimensionality_reduction()
+
+    # Reduce the data
+    gan.reduce_all_data()
