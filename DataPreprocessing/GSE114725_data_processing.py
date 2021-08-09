@@ -1,4 +1,25 @@
 # GSE114725_data_processing.py
+"""
+Takes filtered, sampled data and pre-processes the dataset.
+Produces overview plots.
+
+Inputs
+------
+    GSE114725_data_filtered_10000.csv
+        filtered, sampled data
+
+Outputs
+-------
+    GSE114725_processed_data_10000_3912.csv
+        processed expression values
+    GSE114725_processed_annotations_10000_3912.csv
+        processed annotations
+    GSE114725_10000_3912_plot
+        PCA, t-SNE and UMAP of the processed data with cell labels
+    GSE114725_10000_3912_patient_plot
+        PCA, t-SNE and UMAP of the processed data with patient labels
+    
+"""
 
 # Import modules
 import numpy as np

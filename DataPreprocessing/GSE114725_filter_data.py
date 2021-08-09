@@ -1,4 +1,17 @@
 # GSE114725_filter_data.py
+"""
+Takes raw inputed data, filters for Tumor samples and samples 10000 cells 
+
+Inputs
+------
+    imputed_corrected.csv
+        raw data
+
+Outputs
+-------
+    GSE114725_data_filtered_10000.csv
+        filtered and sampled data
+"""
 
 # Import pandas
 import pandas as pd

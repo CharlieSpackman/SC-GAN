@@ -1,4 +1,28 @@
 # evaluation_metrics.py
+"""
+Create evaluation metrics based on predictions from scPred.
+
+Inputs
+------
+    
+    MODEL_NAME : string
+        file name of the trained model
+    EPOCH : int
+        epoch number that will be evaluated
+    MODEL_PATH : string
+        folder path to where the models are saved
+
+Outputs
+-------
+    metrics_arr : DataFrame
+        computed classification metrics
+
+
+Functions
+---------
+    compute_metrics
+        Takes predictions as inputs and calculates classification metrics
+"""
 
 # Import modules
 import pandas as pd
@@ -22,7 +46,7 @@ MODEL_NAME = "5e-05_300000_64_100_302" ### Update this as required
 EPOCH = 270000 ### Update this as required
 
 # Paths for reduced data
-MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models"
+MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models" ### Update this as required
 METRICS_PATH = f"{MODEL_PATH}\\{MODEL_NAME}\\metrics\\"
 
 print("[INFO] Reading data")
@@ -39,6 +63,26 @@ plt.xticks(rotation=90)
 
 # Define a function to compute performance metrics for each dataset
 def compute_metrics(data, axes, ax_title):
+    """
+    Computes classification metrics based on a set of predictions and correct labels.
+    Creates a confusion matrix with GAN reduced and baseline performance.
+
+    Parameters
+    ----------
+        data : array
+            predictions and correct labels
+        anno-axes : plt.Axes
+            name of the plt.Axes object that the plot will be saved to
+        ax_title : string
+            title of the plot
+
+    Returns
+    ----------
+        metrics_arr : DataFrame
+            set of classification metrics
+        ax : plt.Axes
+            plot object
+    """
 
     # Split out the predictions and the labels
     y_true = data["labels"]
@@ -89,6 +133,7 @@ print("[INFO] Computing metrics")
 scPred_gan_reduced_metrics, scPred_gan_reduced_plot = compute_metrics(scPred_gan_reduced, axes[0], "scPred: GAN Reduced")
 scPred_baseline_metrics, scPred_baseline_plot = compute_metrics(scPred_baseline, axes[1], "scPred: Baseline")
 
+# Reposition the chart objects
 box = scPred_gan_reduced_plot.get_position()
 scPred_gan_reduced_plot.set_position([box.x0 - box.width * 0.05, box.y0, box.width * 0.9, box.height])
 

@@ -13,22 +13,22 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL = "5e-05_300000_64_100_302" ### Update this as required
+MODEL_NAME = "5e-05_300000_64_100_302" ### Update this as required
 EPOCH = 270000 ### Update this as required
 
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
-    MODEL,
+    MODEL_NAME,
     "/data/data_reduced_gan_",
     EPOCH,
     ".csv",
     sep = "")
 
 # Get file paths for the baseline data
-baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_data_10000_3912.csv"
+baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_data_10000_3912.csv" ### Update this as required
 
 # Get the annotations
-anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_3912.csv"
+anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_3912.csv" ### Update this as required
 
 # Define a function to create the Seurat object
 scPred <- function(data, anno) {
@@ -94,7 +94,7 @@ gan_predictions = scPred(gan_reduced_data, anno)
 # File path
 gan_path = paste(
   "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
-  MODEL,
+  MODEL_NAME,
   "/metrics/scPred_reduced_gan_predictions_",
   EPOCH,
   ".csv",
@@ -115,7 +115,7 @@ baseline_predictions = scPred(baseline_data, anno)
 # File path
 baseline_path = paste(
   "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
-  MODEL,
+  MODEL_NAME,
   "/metrics/scPred_baseline_predictions_",
   EPOCH,
   ".csv",

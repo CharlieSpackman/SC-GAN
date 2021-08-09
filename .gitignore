@@ -1,9 +1,8 @@
 DataPreprocessing/GSE114727/
 DataPreprocessing/cache/
 DataPreprocessing/archive/
-
+ModelCreation/archive
 models/
-
 ModelEvaluation/archive
 
 .vscode/
@@ -18,4 +17,3 @@ ModelEvaluation/archive
 **/*.png
 **/*.ipynb
 
-ModelCreation/archive
