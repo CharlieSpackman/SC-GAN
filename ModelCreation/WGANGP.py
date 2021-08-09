@@ -222,6 +222,8 @@ class WGANGP():
         combined model for the Generator with input (used internally, not by the user)
     discriminator_model : tf.keras.Model
         combined model for the Discriminator with input (userd internally, not by the user)
+    discriminator_hidden : tf.keras.Model
+        Discriminator model with output at the final hidden layer
     
 
     Methods
