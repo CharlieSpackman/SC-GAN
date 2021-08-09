@@ -95,7 +95,6 @@ def rescale_arr(arr):
 
 # Define a helper class to manage to the random weighted average which is called during training
 class RandomWeightedAverage(tf.keras.layers.Layer):
-
     """
     A class created a random weighted average of real and generated samples.
 
@@ -339,7 +338,6 @@ class WGANGP():
 
 
     def init_data(self, data_fname, anno_fname):
-
         """
         Reads and initialises the training and validation data.
         Creates placeholder objects for metrics.
