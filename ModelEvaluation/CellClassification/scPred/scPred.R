@@ -13,8 +13,8 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL_NAME = "5e-05_300000_64_100_302" ### Update this as required
-EPOCH = 270000 ### Update this as required
+MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+EPOCH = 150000 ### Update this as required
 
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
@@ -100,7 +100,7 @@ gan_path = paste(
   ".csv",
   sep = "")
 
-# Save the predictions as a csv file
+# Save the predictions as a csv filex
 write.csv(gan_predictions, gan_path, row.names = FALSE)
 
 

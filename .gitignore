@@ -4,6 +4,8 @@ DataPreprocessing/archive/
 ModelCreation/archive
 models/
 ModelEvaluation/archive
+ModelEvaluation/CellClassification/archive
+ModelEvaluation/DimensionalityReduction/archive
 
 .vscode/
 **/*.csv

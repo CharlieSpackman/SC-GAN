@@ -42,8 +42,8 @@ plt.rc('legend', fontsize=MEDIUM_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
 
 # Evaluation parameters
-MODEL_NAME = "5e-05_300000_64_100_302" ### Update this as required
-EPOCH = 270000 ### Update this as required
+MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+EPOCH = 150000 ### Update this as required
 
 # Paths for reduced data
 MODEL_PATH = "C:\\Users\\spack\\OneDrive - King's College London\\Individual Project\\Single Cell Sequencing with GANs\\Implementation\\models" ### Update this as required

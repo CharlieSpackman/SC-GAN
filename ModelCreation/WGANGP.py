@@ -48,9 +48,6 @@ from sklearn.decomposition import PCA
 from MulticoreTSNE import MulticoreTSNE as TSNE
 from umap import UMAP
 
-# import cluster metrics
-from sklearn.metrics import silhouette_score, calinski_harabasz_score
-
 # Set matplotlib settings
 plt.style.use('ggplot')
 SMALL_SIZE = 14
@@ -252,10 +249,6 @@ class WGANGP():
         produces the Hausdorff distance and Wasserstein loss graphs
     produce_similarity_graph():
         produces a similarity graph of a sample of real and generated cells
-    evaluate_dimensionality_reduction():
-        evaluates the Discriminator's ability to reduce data
-    reduce_all_data():
-        runs all data through the Discriminator network and outputs the values at the final hidden layer
     _create_checkpoint(epoch):
         saves the model parameters when called
     get_model_summaries():
@@ -412,7 +405,7 @@ class WGANGP():
 
         return self.X_train, self.X_test, self.y_train, self.y_test
 
-
+    
     def init_networks(self):
         """
         Initialises the networks.
@@ -503,8 +496,8 @@ class WGANGP():
         print("[INFO] Networks successfully initialised")
 
         return None
-
-
+    
+    
     def _gradient_penalty_loss(self, y_true, y_pred, averaged_samples):
         """
         Computes gradient penalty based on prediction and weighted real / fake samples.
@@ -520,7 +513,6 @@ class WGANGP():
         gradient_penalty = tf.math.square(1 - gradient_l2_norm)
         # Return the mean as loss over all the batch samples
         return tf.math.reduce_mean(gradient_penalty)
-
 
     def _wasserstein_loss(self, y_true, y_pred):
         """
@@ -540,7 +532,6 @@ class WGANGP():
 
         return dist
 
-
     def _build_generator(self):
         """
         Creates the Generator network.
@@ -551,14 +542,14 @@ class WGANGP():
         # Layer 1
         model.add(Dense(
             input_dim=self.noise_dim, 
-            units=600, 
+            units=500, 
             kernel_initializer='he_normal',
             name = "Layer_1"))
         model.add(LeakyReLU(alpha=0.2))
 
         # Layer 2
         model.add(Dense(
-            units=600, 
+            units=1000, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
@@ -574,7 +565,6 @@ class WGANGP():
         img = model(noise)
 
         return Model(noise, img)
-
 
     def _build_discriminator(self):
         """
@@ -593,7 +583,7 @@ class WGANGP():
 
         # Layer 2
         model.add(Dense(
-            units = 50, 
+            units = 200, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
@@ -760,7 +750,7 @@ class WGANGP():
 
         return None 
 
-
+    
     def produce_loss_graph(self):
         """
         Creates the loss graph.
@@ -850,7 +840,8 @@ class WGANGP():
         print("done!")
 
         return None
-
+    
+    
     def produce_similarity_graph(self):
         """
         Creates the similarity graph.
@@ -949,225 +940,9 @@ class WGANGP():
 
         print("done!")
 
-        return None
+        return None           
 
-    def evaluate_dimensionality_reduction(self):
-        """
-        Creates a neural network from the Discriminator where the final hidden layer is the outputs.
-        Reduces the validation set and calculates cluster metrics compared to the baseline data.
-        Creates plots of the GAN reduced data and baseline data.
-        """
-
-        # Define a function to extract metrics
-        def get_metrics(data, labels):
-            """
-            Calculates cluster metrics for given data and labels
-
-            Parameters
-            ----------
-                data : array
-                    data to be evaluated
-                labels : array
-                    cluster labels corresponding to the data
-
-            Returns
-            ----------
-            metrics_list : DataFrame
-                metrics computed from cluster evaluation
-            """
-
-            # Create an empty list
-            metrics_list = []
-
-            # Append the metrics to a list
-            metrics_list.append(silhouette_score(data, labels))
-            metrics_list.append(calinski_harabasz_score(data, labels))
-
-            # Combine results into a Pandas Series
-            metrics_labels = [
-                "Silhouette Score",
-                "Calinski-Harabasz Score"
-                ]
-            
-            # Reshape the array
-            metrics_list = np.array(metrics_list).reshape(1, -1)
-
-            # Create Pandas series
-            metrics_list = pd.DataFrame(data = metrics_list, columns=metrics_labels)
-
-            
-            return metrics_list
-
-        # Create a model which outputs the Discriminator hidden layer
-        self.discriminator_hidden = tf.keras.Model(self.discriminator.layers[1].layers[0].input, self.discriminator.layers[1].layers[3].output)
-        print("[INFO] Model created")
-
-        # Reduce the dimensionality of the data using the Discriminator
-        X_test_reduced = self.discriminator_hidden(self.X_test).numpy()
-
-        # Rescale the data
-        X_test_reduced = MinMaxScaler().fit_transform(X_test_reduced)
-
-        ### Perform further dimensionality reduction ###
-        print("[INFO] Reducing dimensions...")
-
-        # Reduce the datasets with PCA
-        pcs = PCA(n_components=50).fit_transform(self.X_test)
-        pca = PCA(n_components=2).fit_transform(self.X_test)
-        pca_gan = PCA(n_components=2).fit_transform(X_test_reduced)
-        print("[INFO] PCA complete")
-
-        # Reduce the datasets with TSNE
-        tsne = TSNE().fit_transform(pcs)
-        tsne_gan = TSNE().fit_transform(X_test_reduced)
-        print("[INFO] t-SNE complete")
-
-        # Reduce the datasets with UMAP
-        umap = UMAP().fit_transform(pcs)
-        umap_gan = UMAP().fit_transform(X_test_reduced)
-        print("[INFO] UMAP complete")
-
-        print("[INFO] Data has been reduced")
-
-        # Compute metrics for PCA
-        pca_metrics = get_metrics(pca, self.y_test)
-        pca_gan_metrics = get_metrics(pca_gan, self.y_test)
-
-        # Compute metrics for t-SNE
-        tsne_metrics = get_metrics(tsne, self.y_test)
-        tsne_gan_metrics = get_metrics(tsne_gan, self.y_test)
-
-        # Compute metrics for umap
-        umap_metrics = get_metrics(umap, self.y_test)
-        umap_gan_metrics = get_metrics(umap_gan, self.y_test)
-
-
-        ### Combine and export metrics ###
-        row_names = pd.Series([
-            "PCA", "GAN+PCA",
-            "TSNE", "GAN+TSNE",
-            "UMAP", "GAN+UMAP"], name = "Index")
-
-        combined_metrics = pd.concat([
-            pca_metrics,
-            pca_gan_metrics,
-            tsne_metrics,
-            tsne_gan_metrics,
-            umap_metrics,
-            umap_gan_metrics],
-            axis = 0).reset_index(drop = True)
-
-        combined_metrics["Index"] = row_names
-        combined_metrics = combined_metrics.set_index("Index").round(2)
-
-        # Save dataframe as csv
-        combined_metrics.to_csv(get_path(f"{self.ckpt_path}/{self.file_name}/metrics/dimensionality_reduction_metrics.csv"))
-        print("[INFO] Evaluation metrics created")
-
-
-        ### Plot the data ###
-        # Create a mapping between classes and colours
-        color_map = {
-            "B"   : "#00798c",
-            "MACROPHAGE"    : "#C77CFF",
-            "MAST" : "#edae49",
-            "NEUTROPHIL"  : "#66a182",
-            "NK"   : "#2e4057",
-            "NKT": "#8c8c8c",
-            "T": "#f37735",
-            "mDC": "#d11141",
-            "pDC":"#A6611A"}
-
-        patchList = []
-        for key in color_map:
-                data_key = plt.scatter([],[], s = point_size*3, marker=".", color = color_map[key], label=key)
-                patchList.append(data_key)
-
-        plot_colors = list(map(color_map.get, self.y_test))
-
-        # Plot the results for sample correlation
-        axis_size = 8.0
-        plot_ratios = {'height_ratios': [1,1,1.1], 'width_ratios': [1,1]}
-        fig, axs = plt.subplots(3, 2, figsize=(axis_size*3, axis_size*3), gridspec_kw=plot_ratios, squeeze=True)
-
-        # PCA plot
-        axs[0,1].scatter(pca[:,0], pca[:,1], c = plot_colors, s = point_size)
-        axs[0,1].title.set_text(f"PCA")
-        axs[0,1].set_xlabel("PC 1")
-        axs[0,1].set_ylabel("PC 2")
-
-        # GAN + PCA plot
-        axs[0,0].scatter(pca_gan[:,0], pca_gan[:,1], c = plot_colors, s = point_size)
-        axs[0,0].title.set_text(f"GAN + PCA")
-        axs[0,0].set_xlabel("PC 1")
-        axs[0,0].set_ylabel("PC 2")
-
-        # t-SNE plot
-        axs[1,1].scatter(tsne[:,0], tsne[:,1], c = plot_colors, s = point_size)
-        axs[1,1].title.set_text(f"t-SNE")
-        axs[1,1].set_xlabel("TSNE 1")
-        axs[1,1].set_ylabel("TSNE 2")
-
-        # GAN + t-SNE plot
-        axs[1,0].scatter(tsne_gan[:,0], tsne_gan[:,1], c = plot_colors, s = point_size)
-        axs[1,0].title.set_text(f"GAN + t-SNE")
-        axs[1,0].set_xlabel("TSNE 1")
-        axs[1,0].set_ylabel("TSNE 2")
-
-        # UMAP plot
-        axs[2,1].scatter(umap[:,0], umap[:,1], c = plot_colors, s = point_size)
-        axs[2,1].title.set_text(f"UMAP")
-        axs[2,1].set_xlabel("UMAP 1")
-        axs[2,1].set_ylabel("UMAP 2")
-        box = axs[2,1].get_position()
-        axs[2,1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
-
-        # GAN + UMAP plot
-        axs[2,0].scatter(umap_gan[:,0], umap_gan[:,1], label = "GAN + UMAP", c = plot_colors, s = point_size)
-        axs[2,0].title.set_text(f"GAN + UMAP")
-        axs[2,0].set_xlabel("UMAP 1")
-        axs[2,0].set_ylabel("UMAP 2")
-        box = axs[2,0].get_position()
-        axs[2,0].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
-
-        fig.legend(handles = patchList, loc = "lower center", ncol = 9, frameon = False, markerscale=2, bbox_to_anchor = [0.5, 0.075])
-
-        fig.savefig(fname=get_path(f"{self.ckpt_path}/{self.file_name}/images/dimensionality_reduction_plot.png"))
-        plt.clf() 
-        print("[INFO] Evaluation plot saved")
-
-        return None
-
-
-    def reduce_all_data(self):
-        """
-        Reduces all data to the dimension specified in the final hidden layer of the Discriminator.
-        """
-
-        X = np.concatenate(
-            (self.X_train, self.X_test),
-            axis = 0
-        )
-
-        # Reduce the dimensionality of the data using the Discriminator
-        data_gan_reduced = self.discriminator_hidden(X).numpy()
-        data_gan_reduced = data_gan_reduced + abs(data_gan_reduced.min())
-        data_gan_reduced = MinMaxScaler().fit_transform(data_gan_reduced)
-
-        # Save the data
-        col_names = [f"Component {i+1}" for i in range(data_gan_reduced.shape[1])]
-        export_data = pd.DataFrame(data = data_gan_reduced, columns=col_names)
-
-        export_data.to_csv(
-            get_path(f"{self.ckpt_path}/{self.file_name}/data/data_reduced_gan.csv"), 
-            sep=",",
-            index=False)
-
-        print("[INFO] Data has been reduced and saved")
-
-        return None
-
-
+    
     def _create_checkpoint(self, epoch):
         """
         Saves the models and optimizer.
@@ -1272,7 +1047,7 @@ if __name__ == '__main__':
         disc_updates = 5,
         grad_pen = 10,
         feature_range=(0,1),
-        seed = 1001,
+        seed = 3001,
         data_path = "../DataPreprocessing/GSE114725",
         ckpt_path="../models",
         ckpt_freq = 2000,
@@ -1293,9 +1068,3 @@ if __name__ == '__main__':
     # Evaluate the GAN
     gan.produce_similarity_graph()
     gan.produce_loss_graph()
-
-    # Evaluate Dimensionality Reduction
-    gan.evaluate_dimensionality_reduction()
-
-    # Reduce the data
-    gan.reduce_all_data()
