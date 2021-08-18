@@ -1,6 +1,13 @@
 # WGANGP.py
 """
-Create, train and evaluate a WGANGP using sc-RNA seq data.
+REFERENCES
+----------
+improved_gwan.py, keras-team, Github, accessed 01/07/2021, https://github.com/keras-team/keras-contrib/blob/master/examples/improved_wgan.py 
+WGAN-GP_minal.py, luslab, Github, accessed 01/07/2021, https://github.com/luslab/arshamg-scrnaseq-wgan/tree/master/scripts
+
+OVERVIEW
+--------
+Create, train and evaluate a WGAN-GP using scRNA-seq data.
 
 Change model parameters and specify file paths at the bottom of the module.
 
@@ -77,7 +84,6 @@ def get_path(path):
     """
     Takes a relative file path and returns an absolute file path.
     """
-
     return str(Path(path).resolve())
 
 # Define a helper function to rescale an array
@@ -85,7 +91,6 @@ def rescale_arr(arr):
     """
     Takes a Numpy array and rescales all features to be between -10 and 10.
     """
-
     arr_scaled = MinMaxScaler(feature_range=(-10, 10)).fit_transform(arr)
 
     return arr_scaled
@@ -109,8 +114,6 @@ class RandomWeightedAverage(tf.keras.layers.Layer):
     call(inputs):
         Takes a numpy array of real samples and generates a random weighted sample of real and generated samples
     """
-
-
     def __init__(self, batch_size, n_features):
         """
         Constructs all the necessary attributes for object.
@@ -172,7 +175,7 @@ class WGANGP():
     disc_updates : int
         number of time the Discriminator is updated per epoch 
     grad_pen : float
-        gradient penality applied to the loss function
+        gradient penalty applied to the loss function
     feature_range : tuple(float, float)
         range in which the training data will be scaled before starting training
     seed : int
@@ -230,7 +233,7 @@ class WGANGP():
     init_networks():
         creates network objects.
     _gradient_pentality_loss(y_true, y_pred, averaged_samples):
-        calculates the gradient penality loss term.
+        calculates the gradient penalty loss term.
     _wasserstein_loss(y_true, y_pred):
         calculates the Earth-Mover distance
     _hausdorff_distance(real_sample, gen_sample):
@@ -261,17 +264,16 @@ class WGANGP():
         returns a string with all parameters used during training 
     """
 
-
     def __init__(
         self, 
-        lrate = 0.00001,
-        epochs = 100000, 
-        batch_size = 32, 
+        lrate = 0.00005,
+        epochs = 300000, 
+        batch_size = 128, 
         noise_dim = 100,
         disc_updates = 5,
         grad_pen = 10,
         feature_range = (0,1),
-        seed = 2,
+        seed = 1,
         data_path = get_path("../DataPreprocessing/GSE114725"),
         ckpt_freq = 2000,
         ckpt_path = get_path("../models"),
@@ -293,7 +295,7 @@ class WGANGP():
             disc_updates : int
                 number of time the Discriminator is updated per epoch 
             grad_pen : float
-                gradient penality applied to the loss function
+                gradient penalty applied to the loss function
             feature_range : tuple(float, float)
                 range in which the training data will be scaled before starting training
             seed : int
@@ -341,8 +343,8 @@ class WGANGP():
         Parameters
         ----------
             data_fname : string
-                name of the file with the sc-RNA seq data
-            anno-fname : string
+                name of the file with the scRNA-seq data
+            anno_fname : string
                 name of the file with the annotations
 
         Returns
@@ -356,7 +358,6 @@ class WGANGP():
             y_test : array
                 validation labels
         """
-
         print("[INFO] Reading data")
 
         # Load the dataset
@@ -379,6 +380,7 @@ class WGANGP():
             train_size = 0.8, 
             random_state = self.seed) 
 
+        # Get data dimensions
         self.X_train_n = self.X_train.shape[0]
         self.X_test_n = self.X_test.shape[0]
         self.n_features = data.shape[1]
@@ -502,21 +504,27 @@ class WGANGP():
         """
         Computes gradient penalty based on prediction and weighted real / fake samples.
         """
+        # Compute gradients
         gradients = tf.gradients(y_pred, averaged_samples)[0]
+
         # Compute the euclidean norm by squaring 
         gradients_sqr = tf.math.square(gradients)
+
         # Sum over the rows
         gradients_sqr_sum = tf.math.reduce_sum(gradients_sqr, axis=np.arange(1, len(gradients_sqr.shape)))
+
         # Take the square root
         gradient_l2_norm = tf.math.sqrt(gradients_sqr_sum)
+
         # Compute lambda * (1 - ||grad||)^2 still for each single sample
         gradient_penalty = tf.math.square(1 - gradient_l2_norm)
+
         # Return the mean as loss over all the batch samples
         return tf.math.reduce_mean(gradient_penalty)
 
     def _wasserstein_loss(self, y_true, y_pred):
         """
-        Computes the Earth-Mover between two inputs.
+        Computes the Earth-Mover distance between two inputs.
         """
         return tf.math.reduce_mean(y_true * y_pred)
 
@@ -542,14 +550,14 @@ class WGANGP():
         # Layer 1
         model.add(Dense(
             input_dim=self.noise_dim, 
-            units=500, 
+            units=600, 
             kernel_initializer='he_normal',
             name = "Layer_1"))
         model.add(LeakyReLU(alpha=0.2))
 
         # Layer 2
         model.add(Dense(
-            units=1000, 
+            units=600, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
@@ -583,7 +591,7 @@ class WGANGP():
 
         # Layer 2
         model.add(Dense(
-            units = 200, 
+            units = 50, 
             kernel_initializer='he_normal',
             name = "Layer_2"))
         model.add(LeakyReLU(alpha=0.2))
@@ -612,7 +620,7 @@ class WGANGP():
 
     def train(self):
         """
-        Trains the GAN using the WGANGP algorithm.
+        Trains the GAN using the WGAN-GP algorithm.
         Evaluates the network at the eval_freq.
         Saves the model at the ckpt_freq.
         """
@@ -622,14 +630,17 @@ class WGANGP():
         fake =  np.ones((self.batch_size, 1))
         dummy = np.zeros((self.batch_size, 1)) # Dummy array for gradient penalty
 
+        # Start the timer
         start = time.time()
         print("[INFO] starting training...")
 
+        # Loop over all epochs
         for epoch in range(self.epochs):
 
             print("[INFO] starting epoch {} of {}...".format(epoch + 1, self.epochs), end = "")
             epoch_start = time.time()
 
+            # Loop over discriminator updates per epoch
             for _ in range(self.disc_updates):
 
                 # ---------------------
@@ -769,8 +780,11 @@ class WGANGP():
 
         print("[INFO] producing loss graph...", end =  "")
 
-        # Model losses
-        # Convert list of lists into a numpy arrays
+        # ---------------------
+        #  Wasserstein Losses
+        # ---------------------
+
+        # Convert list of lists into a DataFrames
         gen_losses = pd.Series([loss[0] for loss in self.val_loss])
         disc_losses = pd.Series([loss[1] for loss in self.val_loss])
 
@@ -798,7 +812,10 @@ class WGANGP():
         plt.clf()
 
 
-        # Distances
+        # ---------------------
+        #  Hasudorff Distances
+        # ---------------------
+
         # Convert list of lists into a numpy arrays
         epochs = pd.Series([loss[0] for loss in self.hausdorff_dist], dtype=np.float32)
         PCA_losses = pd.Series([loss[1] for loss in self.hausdorff_dist], dtype=np.float32)
@@ -858,11 +875,12 @@ class WGANGP():
             # Subset the cell types
             cells = data[labels == cell_type]
             cells_n = cells.shape[0]
-
+            
+            # Get a random sample
             random_int = np.random.choice(cells_n, size=1, replace=False)
-
             cell = cells[random_int, :]
 
+            # Return sample
             return cell
 
         # Define a function to get the closest generated cell to a sample
@@ -870,15 +888,20 @@ class WGANGP():
             """
             Returns the closest generated cell to a given sample
             """
-
+            # Create a blank list
             distances = []
 
+            # Loop over all generated samples and calculate the Hausdorff Distance to the provided sample
             for cell in generated_samples:
                 distances.append(self._hausdorff_dist(sample, cell.reshape(1,-1)))
 
+            # Convert list to an array
             distances = np.array(distances)
+            
+            # Get the index with the minimum distance
             min_id = np.argmin(distances)
-
+            
+            # Return generated sample with the minimum distance
             return generated_samples[min_id]
 
 
@@ -904,10 +927,12 @@ class WGANGP():
         axs[0].plot(t_cell.reshape(-1,), c = red)
         axs[0].title.set_text(f"T cells")
         axs[0].set_ylabel("Expression")
+        axs[0].set_ylim(bottom = 0.0, top = 1.0)
 
         axs[1].plot(t_cell_gen.reshape(-1,), c = blue)
         axs[1].set_xlabel("Genes")
         axs[1].set_ylabel("Expression")
+        axs[1].set_ylim(bottom = 0.0, top = 1.0)
         box = axs[1].get_position()
         axs[1].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
@@ -915,10 +940,12 @@ class WGANGP():
         axs[2].plot(nk_cell.reshape(-1,), c = red, label = "Real")
         axs[2].title.set_text(f"NK cells")
         axs[2].set_ylabel("Expression")
+        axs[2].set_ylim(bottom = 0.0, top = 1.0)
 
         axs[3].plot(nk_cell_gen.reshape(-1,), c = blue, label = "Generated")
         axs[3].set_xlabel("Genes")
         axs[3].set_ylabel("Expression")
+        axs[3].set_ylim(bottom = 0.0, top = 1.0)
         box = axs[3].get_position()
         axs[3].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
@@ -926,10 +953,12 @@ class WGANGP():
         axs[4].plot(b_cell.reshape(-1,), c = red)
         axs[4].title.set_text(f"B cells")
         axs[4].set_ylabel("Expression")
+        axs[4].set_ylim(bottom = 0.0, top = 1.0)
 
         axs[5].plot(b_cell_gen.reshape(-1,), c = blue)
         axs[5].set_xlabel("Genes")
         axs[5].set_ylabel("Expression")
+        axs[5].set_ylim(bottom = 0.0, top = 1.0)
         box = axs[5].get_position()
         axs[5].set_position([box.x0, box.y0 + box.height * 0.1, box.width, box.height * 0.9])
 
@@ -947,13 +976,14 @@ class WGANGP():
         """
         Saves the models and optimizer.
         """
-
+        # Define path name
         path = get_path("{}/{}/epochs/{:05d}/ckpt".format(
             self.ckpt_path,
             self.file_name,
             epoch+1))
 
         print("[INFO] creating checkpoint")
+        # Save the models
         self.checkpoint.save(file_prefix = path)
 
         return None
@@ -967,14 +997,18 @@ class WGANGP():
 
         print("[INFO] Printing Model Summaries\n")
 
+        # Print model summaries
         print(self.generator.layers[1].summary(), end = "\n\n")
         print(self.discriminator.layers[1].summary(), end = "\n\n")
 
+        # Create balnk lists
         gen, disc = [], []
 
+        # Get the model summaries and append to the lists
         self.generator.layers[1].summary(print_fn=lambda x: gen.append(x))
         self.discriminator.layers[1].summary(print_fn=lambda x: gen.append(x))
 
+        # Save lists to a text file
         with open(get_path(f"{self.ckpt_path}/{self.file_name}/model_summaries.txt"), "w") as f:
 
             for item in gen:
@@ -992,7 +1026,6 @@ class WGANGP():
         """
         Returns the Generator and Discriminator objects.
         """
-
         return self.generator, self.discriminator
 
     # Define a function to get the checkpoint option
@@ -1000,7 +1033,6 @@ class WGANGP():
         """
         Returns the tensorflow checkpoint object
         """
-
         return self.checkpoint
 
     # Define a function to print learning parameters
@@ -1008,14 +1040,14 @@ class WGANGP():
         """
         Creates a .txt file with a summary of the model parameters
         """
-
+        # Define a string with all parameters
         parameters = f"""---Learning Parameters---
 Learning rate = {self.lrate}
 Epochs = {self.epochs}
 Batch size = {self.batch_size}
 Noise size = {self.noise_dim}
 Discriminator updates = {self.disc_updates}
-Gradient Penality = {self.grad_pen}
+Gradient Penalty = {self.grad_pen}
 Feature Range = {self.feature_range}
 Seed = {self.seed}
 Number of features {self.n_features}
@@ -1023,8 +1055,10 @@ Training set size = {self.X_train_n}
 Test set size = {self.X_test_n}
         """
 
+        # Print the parameter list
         print(parameters)
 
+        # Save the string to a text file
         with open(get_path(f"{self.ckpt_path}/{self.file_name}/model_params.txt"), "w") as f:
 
             f.write(parameters)
@@ -1047,7 +1081,7 @@ if __name__ == '__main__':
         disc_updates = 5,
         grad_pen = 10,
         feature_range=(0,1),
-        seed = 3001,
+        seed = 1001,
         data_path = "../DataPreprocessing/GSE114725",
         ckpt_path="../models",
         ckpt_freq = 2000,

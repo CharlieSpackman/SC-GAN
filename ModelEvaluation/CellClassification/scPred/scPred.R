@@ -30,7 +30,10 @@ baseline_data_path = "C:/Users/spack/OneDrive - King's College London/Individual
 # Get the annotations
 anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/DataPreprocessing/GSE114725/GSE114725_processed_annotations_10000_3912.csv" ### Update this as required
 
-# Define a function to create the Seurat object
+#-----------------------
+# scPred Function
+#-----------------------
+
 scPred <- function(data, anno) {
   
   # transpose the data
@@ -84,7 +87,10 @@ scPred <- function(data, anno) {
 # Read in labels
 anno <- read.csv(anno_path)
 
-### GAN evaluation ### 
+#-----------------------
+# GAN Predictions
+#-----------------------
+
 # Read in GAN reduced data
 gan_reduced_data <- read.csv(gan_data_path)
 
@@ -103,14 +109,16 @@ gan_path = paste(
 # Save the predictions as a csv filex
 write.csv(gan_predictions, gan_path, row.names = FALSE)
 
+#-----------------------
+# Baseline Predictions
+#-----------------------
 
-### Baseline evaluation ### 
 # Read in GAN reduced data
 baseline_data <- read.csv(baseline_data_path)
 baseline_data <- baseline_data[, 2:ncol(baseline_data)]
 
 # Get predictions for GAN reduced data
-baseline_predictions = scPred(baseline_data, anno)
+#baseline_predictions = scPred(baseline_data, anno)
 
 # File path
 baseline_path = paste(

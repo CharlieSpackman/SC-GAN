@@ -55,11 +55,17 @@ point_size = 25
 axis_size = 8
 
 
-### Reading in data ###
+#-----------------------
+# Read the Data
+#-----------------------
+
 print("[INFO] Reading data")
+# Read filtered imputed expression values
 adata = sc.read_csv(FILE_PATH + "GSE114725_data_filtered_10000.csv")
+
 # Read in annotations
 anno = pd.read_csv(FILE_PATH + "GSE114725_annotations_filtered_10000.csv")
+
 # Read in genes
 genes = pd.read_csv(FILE_PATH + "GSE114725_genes_filtered_10000.csv", header=None, names = ["Gene IDs"])
 
@@ -77,7 +83,7 @@ adata.X = adata.X + abs(adata.X.min())
 # Calculate metrics
 sc.pp.calculate_qc_metrics(adata, inplace=True)
 
-# Remove samples with too many gene counts
+# Remove samples with too few gene counts
 adata = adata[adata.obs.n_genes_by_counts > 12000, :]
 
 # Identify high variable genes
@@ -86,8 +92,10 @@ sc.pp.highly_variable_genes(adata, inplace=True)
 # Filter out non-highly expressed genes
 adata = adata[:, adata.var.highly_variable]
 
-### Checking data quality ###
-print("[INFO] Checking data quality")
+#-----------------------
+# Dimensionality Reduction
+#-----------------------
+
 # Prepare data for plotting
 data = adata.X
 print("[INFO] Reducing dimensions...")
@@ -107,8 +115,10 @@ print("[INFO] UMAP complete")
 
 print("[INFO] Data has been reduced")
 
+#-----------------------
+# Cell Type Plots
+#-----------------------
 
-### Plot the data - cell types ###
 # Create a mapping between classes and colours
 color_map = {
     "B"   : "#00798c",
@@ -167,7 +177,9 @@ plt.clf()
 print("[INFO] Evaluation plot saved")
 
 
-### Plot the data - patients###
+#-----------------------
+# Patient Plots
+#-----------------------
 # Create a mapping between classes and colours
 color_map = {
     "BC1": "#00798c",
@@ -222,6 +234,10 @@ fig.savefig(fname="GSE114725_10000_3912_patient_plot.png")
 plt.clf() 
 
 print("[INFO] Evaluation plot saved")
+
+#-----------------------
+# Export Data
+#-----------------------
 
 # Export data for model creation and evaluation
 export_data_values = pd.DataFrame(adata.X, index = adata.obs['cellid'], columns = adata.var['Gene IDs'])

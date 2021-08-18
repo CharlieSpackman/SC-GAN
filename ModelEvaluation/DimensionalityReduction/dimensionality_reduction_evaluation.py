@@ -3,6 +3,7 @@
 Creates a neural network from the Discriminator where the final hidden layer is the outputs.
 Reduces the validation set and calculates cluster metrics compared to the baseline data.
 Creates plots of the GAN reduced data and baseline data.
+Creates expression profile plots for Discriminator outputs.
 
 Inputs
 ------
@@ -18,6 +19,7 @@ Outputs
     Dimensionality reduction metrics
     Dimensionality reduction plots
     Reduced GAN data
+    Discriminator output examples
 
 Functions 
 ---------
@@ -29,12 +31,13 @@ Functions
 from pathlib import Path
 import sys
 
+# Add the WGANGP class to the Python path
 sys.path.append(str(Path("../../ModelCreation/").resolve()))
 
-# Import the GAN class
+# Import the WGANGP class and helper functions
 from WGANGP import WGANGP, get_path, rescale_arr
 
-# import standard modules
+# import analysis modules
 import tensorflow as tf
 import numpy as np
 import pandas as pd
@@ -42,7 +45,6 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from MulticoreTSNE import MulticoreTSNE as TSNE
 from umap import UMAP
-from sklearn.preprocessing import MinMaxScaler
 
 # import cluster metrics
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
@@ -64,19 +66,21 @@ blue = "#00798c"
 point_size = 25
 axis_size = 8
 
-
 # Update path to model for evaluation
-CHECKPOINT_PATH = get_path("../../models")
-MODEL_NAME = "5e-05_300000_128_100_2001" ### Update this as required
-EPOCH = 170000 ### Update this as required
-SEED = 2001 ### Update this as required
+CHECKPOINT_PATH = get_path("../../models") ### Update this as required
+MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+EPOCH = 150000 ### Update this as required
+SEED = 1001 ### Update this as required
 
+# Get the latest saved model
 model_path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/epochs/{EPOCH:05d}")
 latest_model = tf.train.latest_checkpoint(get_path(f"{model_path}"))
 
+#-----------------------
+# Read Models
+#-----------------------
 
-### Read in the model ###
-# Create GAN object
+# Create WGANGP object
 gan = WGANGP(seed = SEED, ckpt_path = CHECKPOINT_PATH, data_path = get_path("../../DataPreprocessing/GSE114725"))
 
 # Get the data
@@ -105,17 +109,18 @@ else:
     checkpoint.restore(latest_model)
 
 
-### Reduce the data using tha GAN ###
-# Create a model which outputs the Discriminator hidden layer
+#-----------------------
+# Compute Metrics
+#-----------------------
+
+# Create a model which outputs the first Discriminator hidden layer
 discriminator_hidden = tf.keras.Model(discriminator.layers[1].layers[0].input, discriminator.layers[1].layers[1].output)
 print("[INFO] Model created")
 
-# Reduce the dimensionality of the data using the Discriminator
+# Pass validation data through the Discriminator
 X_test_reduced = discriminator_hidden(X_test).numpy()
 
-X_test_reduced = MinMaxScaler(feature_range=(0.0, gan.data_max_value)).fit_transform(X_test_reduced)
-
-### Perform further dimensionality reduction ###
+# Perform dimensionality reduction
 print("[INFO] Reducing dimensions...")
 
 # Reduce the datasets with PCA
@@ -123,10 +128,11 @@ pca = rescale_arr(PCA(n_components=2).fit_transform(X_test))
 pca_gan = rescale_arr(PCA(n_components=2).fit_transform(X_test_reduced))
 print("[INFO] PCA complete")
 
+# Get 50 PCs for t-SNE and UMAP
 pcs = PCA(n_components=50).fit_transform(X_test)
 pcs_reduced = PCA(n_components=50).fit_transform(X_test_reduced)
 
-# Reduce the datasets with TSNE
+# Reduce the datasets with t-SNE
 tsne = rescale_arr(TSNE().fit_transform(pcs))
 tsne_gan = rescale_arr(TSNE().fit_transform(pcs_reduced))
 print("[INFO] t-SNE complete")
@@ -138,7 +144,6 @@ print("[INFO] UMAP complete")
 
 print("[INFO] Data has been reduced")
 
-### Compute metrics ###
 # Define a function to extract metrics
 def get_metrics(data, labels):
     """
@@ -156,21 +161,23 @@ def get_metrics(data, labels):
     metrics_list : DataFrame
         metrics computed from cluster evaluation
     """
-
+    # Create a blank list
     metrics_list = []
 
+    # Compute the Silhouette Score and Calinkski-Harabasz Index
     metrics_list.append(silhouette_score(data, labels))
     metrics_list.append(calinski_harabasz_score(data, labels))
 
-    # Combine results into a Pandas Series
+    # Define column labels
     metrics_labels = [
         "Silhouette Score",
         "Calinski-Harabasz Score"
         ]
     
+    # Convert lists to arrays and reshape
     metrics_list = np.array(metrics_list).reshape(1, -1)
 
-    # Create Pandas series
+    # Return a DataFrame
     return pd.DataFrame(data = metrics_list, columns=metrics_labels)
 
 # Compute metrics for PCA
@@ -186,7 +193,7 @@ umap_metrics = get_metrics(umap, y_test)
 umap_gan_metrics = get_metrics(umap_gan, y_test)
 
 
-### Combine and export metrics ###
+# Combine and export metrics
 row_names = pd.Series([
     "PCA", "GAN+PCA",
     "TSNE", "GAN+TSNE",
@@ -208,8 +215,10 @@ combined_metrics = combined_metrics.set_index("Index").round(2)
 combined_metrics.to_csv(get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/metrics/dimensionality_reduction_metrics_{EPOCH:05d}.csv"))
 print("[INFO] Evaluation metrics created")
 
+#-----------------------
+# Plot the Data
+#-----------------------
 
-### Plot the data ###
 # Create a mapping between classes and colours
 color_map = {
     "B"   : "#00798c",
@@ -280,11 +289,12 @@ fig.savefig(fname=get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/images/dimensionalit
 plt.clf() 
 print("[INFO] Evaluation plot saved")
 
+#-----------------------
+# Reduce the Data
+#-----------------------
 
-### Reduce the data using tha GAN ###
-# Reduce the dimensionality of the data using the Discriminator
+# Reduce the dimensionality of the full dataset using the Discriminator
 data_gan_reduced = discriminator_hidden(X).numpy()
-data_gan_reduced = MinMaxScaler(feature_range=(0.0, gan.data_max_value)).fit_transform(data_gan_reduced)
 
 # Save the data
 col_names = [f"Component {i+1}" for i in range(data_gan_reduced.shape[1])]
@@ -296,3 +306,32 @@ export_data.to_csv(
     index=False)
 
 print("[INFO] Data has been reduced and saved")
+
+#-----------------------
+# Expression Plots
+#-----------------------
+
+# Get some examples of the Discriminator output
+values = export_data.values[:3]
+
+# Define the plot
+plot_ratios = {'height_ratios': [1, 1, 1], 'width_ratios': [1]}
+fig, axs = plt.subplots(3, 1, figsize=(axis_size*2, axis_size*3), gridspec_kw=plot_ratios, squeeze=True)
+
+# Example 1
+axs[0].plot(values[0], c = red)
+axs[0].set_ylabel("Expression")
+
+# Example 2
+axs[1].plot(values[1], c = red)
+axs[1].set_ylabel("Expression")
+
+# Example 3
+axs[2].plot(values[2], c = red)
+axs[2].set_ylabel("Expression")
+axs[2].set_xlabel("Genes")
+
+fig.savefig(fname=get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/images/dimensionality_reduction_expression_examples_{EPOCH:05d}.png"))
+plt.clf() 
+
+print("[INFO] Discriminator example outputs created and plotted")

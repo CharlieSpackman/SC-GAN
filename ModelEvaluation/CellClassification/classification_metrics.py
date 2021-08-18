@@ -71,7 +71,7 @@ def compute_metrics(data, axes, ax_title):
     ----------
         data : array
             predictions and correct labels
-        anno-axes : plt.Axes
+        axes : plt.Axes
             name of the plt.Axes object that the plot will be saved to
         ax_title : string
             title of the plot
@@ -88,6 +88,7 @@ def compute_metrics(data, axes, ax_title):
     y_true = data["labels"]
     y_pred = data["predictions"]
 
+    # Define the class labels
     class_labels = [
         "B",
         "MACROPHAGE",
@@ -99,7 +100,6 @@ def compute_metrics(data, axes, ax_title):
         "mDC",
         "pDC"
         ]
-
 
     # Compute accuracy
     accuracy = metrics.accuracy_score(y_true, y_pred)
@@ -125,7 +125,7 @@ def compute_metrics(data, axes, ax_title):
     ax.set_title(ax_title)
     ax.set_xticklabels(class_labels, rotation=90, ha='right')
 
-
+    # Return the metrics and axes object
     return metrics_arr, ax
 
 print("[INFO] Computing metrics")

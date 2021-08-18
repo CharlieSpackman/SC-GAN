@@ -13,11 +13,11 @@ Outputs
         filtered and sampled data
 """
 
-# Import pandas
+# Import modules
 import pandas as pd
 import numpy as np
 
-# Read the data - update name as neccessary
+# Read the data
 data = pd.read_csv("GSE114725\\imputed_corrected.csv", index_col = "cellid")
 
 # Subset Tumor cells
@@ -56,7 +56,6 @@ tumor_anno.to_csv("GSE114725\\GSE114725_annotations_filtered_10000.csv")
 # Split out the genes and write to csv
 tumor_genes = sample_data.columns.values[4:].astype(str)
 np.savetxt("GSE114725\\GSE114725_genes_filtered_10000.csv", tumor_genes, delimiter = ",", fmt='%s')
-
 
 # Write values to csv
 np.savetxt("GSE114725\\GSE114725_data_filtered_10000.csv", sample_data.iloc[:, 4:].values, delimiter = ",")
