@@ -100,16 +100,16 @@ adata = adata[:, adata.var.highly_variable]
 data = adata.X
 print("[INFO] Reducing dimensions...")
 
-# Reduce the datasets with PCA
+# Reduce the dataset with PCA
 pcs = PCA(n_components=50).fit_transform(data)
 pca = PCA().fit_transform(pcs)
 print("[INFO] PCA complete")
 
-# Reduce the datasets with TSNE
+# Reduce the dataset with t-SNE
 tsne = TSNE().fit_transform(pcs)
 print("[INFO] t-SNE complete")
 
-# Reduce the datasets with UMAP
+# Reduce the dataset with UMAP
 umap = UMAP().fit_transform(pcs)
 print("[INFO] UMAP complete")
 
@@ -121,23 +121,25 @@ print("[INFO] Data has been reduced")
 
 # Create a mapping between classes and colours
 color_map = {
-    "B"   : "#00798c",
-    "MACROPHAGE"    : "#C77CFF",
-    "MAST" : "#edae49",
-    "NEUTROPHIL"  : "#66a182",
-    "NK"   : "#2e4057",
-    "NKT": "#8c8c8c",
-    "T": "#f37735",
-    "mDC": "#d11141",
-    "pDC":"#A6611A"}
+    "B"         :"#00798c",
+    "MACROPHAGE":"#C77CFF",
+    "MAST"      :"#edae49",
+    "NEUTROPHIL":"#66a182",
+    "NK"        :"#2e4057",
+    "NKT"       :"#8c8c8c",
+    "T"         :"#f37735",
+    "mDC"       :"#d11141",
+    "pDC"       :"#A6611A"}
 
 patchList = []
 for key in color_map:
         data_key = plt.scatter([],[], s = point_size*3, marker=".", color = color_map[key], label=key)
         patchList.append(data_key)
 
+# Get labels
 labels = adata.obs['Macro Cell Type'].values
 
+# Map colours to labels
 plot_colors = list(map(color_map.get, labels))
 
 # Plot the samples with cell labels
@@ -195,8 +197,10 @@ for key in color_map:
         data_key = plt.scatter([],[], s = point_size*3, marker=".", color = color_map[key], label=key)
         patchList.append(data_key)
 
+# Get labels
 labels = adata.obs['patient'].values
 
+# Map colours to labels
 plot_colors = list(map(color_map.get, labels))
 
 # Plot the samples with patient labels
@@ -254,5 +258,3 @@ export_data_anno.to_csv("GSE114725\\GSE114725_processed_annotations_10000_3912.c
 adata.write(results_file)
 
 print("[INFO] Data successfully exported")
-
-

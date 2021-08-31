@@ -1,6 +1,6 @@
 # GSE114725_filter_data.py
 """
-Takes raw inputed data, filters for Tumor samples and samples 10000 cells 
+Takes raw inputed data, filters for Tumor samples and sub-samples 10000 cells.
 
 Inputs
 ------
@@ -59,5 +59,3 @@ np.savetxt("GSE114725\\GSE114725_genes_filtered_10000.csv", tumor_genes, delimit
 
 # Write values to csv
 np.savetxt("GSE114725\\GSE114725_data_filtered_10000.csv", sample_data.iloc[:, 4:].values, delimiter = ",")
-
-

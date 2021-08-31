@@ -4,7 +4,6 @@ Create evaluation metrics based on predictions from scPred.
 
 Inputs
 ------
-    
     MODEL_NAME : string
         file name of the trained model
     EPOCH : int
@@ -41,8 +40,8 @@ plt.rc('ytick', labelsize=SMALL_SIZE)
 plt.rc('legend', fontsize=MEDIUM_SIZE)  
 plt.rc('figure', titlesize=BIGGER_SIZE)
 
-# Evaluation parameters
-MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+# Model name to be evaluated
+MODEL_NAME = "5e-05_300000_128_100_1" ### Update this as required
 EPOCH = 150000 ### Update this as required
 
 # Paths for reduced data
@@ -53,7 +52,6 @@ print("[INFO] Reading data")
 # Read in predictions and labels for scPred
 scPred_gan_reduced = pd.read_csv(METRICS_PATH + f"scPred_reduced_gan_predictions_{EPOCH:05d}.csv")
 scPred_baseline = pd.read_csv(METRICS_PATH + f"scPred_baseline_predictions_{EPOCH:05d}.csv")
-
 
 # Create plots for scPred
 axis_size = 8.0

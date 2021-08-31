@@ -13,9 +13,10 @@ set.seed(30)
 setwd("C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/ModelEvaluation/Cell Classification/scPred")
 
 # Get file path for the GAN reduced data
-MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+MODEL_NAME = "5e-05_300000_128_100_1" ### Update this as required
 EPOCH = 150000 ### Update this as required
 
+# Define the file path
 gan_data_path = paste(
     "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
     MODEL_NAME,
@@ -35,6 +36,9 @@ anno_path = "C:/Users/spack/OneDrive - King's College London/Individual Project/
 #-----------------------
 
 scPred <- function(data, anno) {
+
+  # Takes the scRNA-data and cell annotations as inputs
+  # Retruns the set of predictions and true labels for the validation data
   
   # transpose the data
   data_t <- transpose(data)
@@ -97,7 +101,7 @@ gan_reduced_data <- read.csv(gan_data_path)
 # Get predictions for GAN reduced data
 gan_predictions = scPred(gan_reduced_data, anno)
 
-# File path
+# Define file path to save to
 gan_path = paste(
   "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
   MODEL_NAME,
@@ -106,7 +110,7 @@ gan_path = paste(
   ".csv",
   sep = "")
 
-# Save the predictions as a csv filex
+# Save the predictions as a .csv filex
 write.csv(gan_predictions, gan_path, row.names = FALSE)
 
 #-----------------------
@@ -118,9 +122,9 @@ baseline_data <- read.csv(baseline_data_path)
 baseline_data <- baseline_data[, 2:ncol(baseline_data)]
 
 # Get predictions for GAN reduced data
-#baseline_predictions = scPred(baseline_data, anno)
+baseline_predictions = scPred(baseline_data, anno)
 
-# File path
+# Define file path to save to
 baseline_path = paste(
   "C:/Users/spack/OneDrive - King's College London/Individual Project/Single Cell Sequencing with GANs/Implementation/models/",
   MODEL_NAME,

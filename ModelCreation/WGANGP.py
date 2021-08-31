@@ -2,8 +2,8 @@
 """
 REFERENCES
 ----------
-improved_gwan.py, keras-team, Github, accessed 01/07/2021, https://github.com/keras-team/keras-contrib/blob/master/examples/improved_wgan.py 
-WGAN-GP_minal.py, luslab, Github, accessed 01/07/2021, https://github.com/luslab/arshamg-scrnaseq-wgan/tree/master/scripts
+improved_gwan.py, keras-team, Github, accessed [online] 01/07/2021, https://github.com/keras-team/keras-contrib/blob/master/examples/improved_wgan.py 
+WGAN-GP_minal.py, luslab, Github, accessed [online] 01/07/2021, https://github.com/luslab/arshamg-scrnaseq-wgan/tree/master/scripts
 
 OVERVIEW
 --------
@@ -98,7 +98,7 @@ def rescale_arr(arr):
 # Define a helper class to manage to the random weighted average which is called during training
 class RandomWeightedAverage(tf.keras.layers.Layer):
     """
-    A class created a random weighted average of real and generated samples.
+    A class for creating a random weighted average of real and generated samples.
 
     ...
 
@@ -229,11 +229,11 @@ class WGANGP():
     Methods
     -------   
     init_data(data_fname, anno_fname):
-        reads training data.
+        reads training data
     init_networks():
-        creates network objects.
+        creates network objects
     _gradient_pentality_loss(y_true, y_pred, averaged_samples):
-        calculates the gradient penalty loss term.
+        calculates the gradient penalty loss term
     _wasserstein_loss(y_true, y_pred):
         calculates the Earth-Mover distance
     _hausdorff_distance(real_sample, gen_sample):
@@ -247,7 +247,7 @@ class WGANGP():
     train():
         trains the Generator and Discriminator
     _evaluate_model(epoch):
-        computes the hausdorff distance between the validation set and generated samples
+        computes the Hausdorff distance between the validation set and generated samples
     produce_loss_graph():
         produces the Hausdorff distance and Wasserstein loss graphs
     produce_similarity_graph():
@@ -259,7 +259,7 @@ class WGANGP():
     get_models():
         returns the Generator and Discriminator objects
     get_checkpoint_obj()
-        returns the tensorflow checkpoint object
+        returns the Tensorflow checkpoint object
     get_learning_parameters():
         returns a string with all parameters used during training 
     """
@@ -415,11 +415,10 @@ class WGANGP():
 
         print("[INFO] Initialising newtorks")
 
-
         # Define the Optimizer
         self.optimizer = Adam(learning_rate=self.lrate, beta_1=0.0, beta_2=0.9)
 
-        # Build the generator and critic
+        # Build the Generator and Discriminator
         self.generator = self._build_generator()
         self.discriminator = self._build_discriminator()
 
@@ -428,22 +427,22 @@ class WGANGP():
         # for the Discriminator
         #-------------------------------
 
-        # Freeze generator's layers while training critic
+        # Freeze Generator's layers while training Discriminator
         self.generator.trainable = False
 
-        # Image input (real sample)
+        # Sample input (real sample)
         real_sample = Input(shape=self.n_features)
 
         # Noise input
         z_disc = Input(shape=(self.noise_dim,))
-        # Generate image based of noise (fake sample)
+        # Generate sample based of noise (fake sample)
         fake_sample = self.generator(z_disc)
 
-        # Discriminator determines validity of the real and fake images
+        # Discriminator determines validity of the real and fake samples
         fake = self.discriminator(fake_sample)
         valid = self.discriminator(real_sample)
 
-        # Construct weighted average between real and fake images
+        # Construct weighted average between real and fake samples
         interpolated_img = RandomWeightedAverage(self.batch_size, self.n_features).call([real_sample, fake_sample])
         # Determine validity of weighted sample
         validity_interpolated = self.discriminator(interpolated_img)
@@ -473,17 +472,17 @@ class WGANGP():
         # for the Generator
         #-------------------------------
 
-        # For the generator we freeze the discriminator's layers
+        # For the Generator the Discriminator's layers are frozen
         self.discriminator.trainable = False
         self.generator.trainable = True
 
-        # Sampled noise for input to generator
+        # Sampled noise for input to Generator
         z_gen = Input(shape=(self.noise_dim,))
-        # Generate images based of noise
+        # Generate samples based of noise
         sample = self.generator(z_gen)
         # Discriminator determines validity
         valid = self.discriminator(sample)
-        # Defines generator model
+        # Define Generator model
         self.generator_model = Model(z_gen, valid)
         self.generator_model.compile(loss=self._wasserstein_loss, optimizer=self.optimizer)
 
@@ -507,7 +506,7 @@ class WGANGP():
         # Compute gradients
         gradients = tf.gradients(y_pred, averaged_samples)[0]
 
-        # Compute the euclidean norm by squaring 
+        # Compute the Euclidean norm by squaring 
         gradients_sqr = tf.math.square(gradients)
 
         # Sum over the rows
@@ -545,6 +544,7 @@ class WGANGP():
         Creates the Generator network.
         """
 
+        # Create model object
         model = Sequential(name="Generator")
 
         # Layer 1
@@ -569,6 +569,7 @@ class WGANGP():
             kernel_initializer='he_normal',
             name = "Output_layer"))
 
+        # Define inputs
         noise = Input(shape=(self.noise_dim,))
         img = model(noise)
 
@@ -578,7 +579,7 @@ class WGANGP():
         """
         Creates the Discriminator network.
         """
-
+        # Define model object
         model = Sequential(name="Discriminator")
 
         # Layer 1
@@ -601,7 +602,8 @@ class WGANGP():
             activation = None, 
             kernel_initializer='he_normal',
             name = "Output_layer"))
-
+        
+        # Define inputs
         sample = Input(shape=self.n_features)
         validity = model(sample)
 
@@ -613,9 +615,13 @@ class WGANGP():
         Creates a random latent variable of size (batch_size x dim).
         """
 
+        # Define Normal Distribution
         norm = np.random.normal(0.0, self.data_max_value/10, size=(batch_size, dim))
+        
+        # Define Poisson Distribution
         poisson = np.random.poisson(1, size=(batch_size, dim))
 
+        # Return the absolute value of their sum
         return np.abs(norm + poisson)
 
     def train(self):
@@ -625,7 +631,7 @@ class WGANGP():
         Saves the model at the ckpt_freq.
         """
 
-        # Adversarial ground truths
+        # Define adversarial ground truths
         valid = -np.ones((self.batch_size, 1))
         fake =  np.ones((self.batch_size, 1))
         dummy = np.zeros((self.batch_size, 1)) # Dummy array for gradient penalty
@@ -651,7 +657,7 @@ class WGANGP():
                 idx = np.random.randint(0, self.X_train_n, self.batch_size)
                 samples = self.X_train[idx]
                 
-                # Sample generator input
+                # Sample Generator input
                 noise = self._create_noise(self.batch_size, self.noise_dim)
                 
                 # Train the Discriminator
@@ -696,11 +702,11 @@ class WGANGP():
         
         print("[INFO] evaluating model...", end = "")
 
-        # Create generated validation data
+        # Create generated validation samples
         noise = self._create_noise(self.X_test_n, self.noise_dim)
         generated_samples = self.generator.predict(noise, steps=1)
 
-        # Join generated samples with test set
+        # Join generated samples with validation set
         combined = np.concatenate((self.X_test, generated_samples), axis = 0)
 
         # Reduce and scale the dataset with PCA 
@@ -709,7 +715,7 @@ class WGANGP():
         # Calculate the correlation between samples
         hausdorff_dist_PCA = self._hausdorff_dist(combined_PCA[self.val_labels==0], combined_PCA[self.val_labels==1])
 
-        # Reduce and scale the dataset with TSNE
+        # Reduce and scale the dataset with t-SNE
         combined_TSNE = rescale_arr(TSNE(n_components=2).fit_transform(pcs))
         # Calculate the correlation between samples
         hausdorff_dist_TSNE = self._hausdorff_dist(combined_TSNE[self.val_labels==0], combined_TSNE[self.val_labels==1])
@@ -869,7 +875,7 @@ class WGANGP():
         # Define a function to retrieve a sample from the test set
         def get_sample(data, labels, cell_type):
             """
-            Returns a single sample from the dataset based on the cell type
+            Returns a single sample from the dataset based on the cell type.
             """
 
             # Subset the cell types
@@ -886,7 +892,7 @@ class WGANGP():
         # Define a function to get the closest generated cell to a sample
         def get_closest_gen(sample, generated_samples):
             """
-            Returns the closest generated cell to a given sample
+            Returns the closest generated cell to a given sample.
             """
             # Create a blank list
             distances = []
@@ -1001,7 +1007,7 @@ class WGANGP():
         print(self.generator.layers[1].summary(), end = "\n\n")
         print(self.discriminator.layers[1].summary(), end = "\n\n")
 
-        # Create balnk lists
+        # Create blank lists
         gen, disc = [], []
 
         # Get the model summaries and append to the lists
@@ -1028,7 +1034,7 @@ class WGANGP():
         """
         return self.generator, self.discriminator
 
-    # Define a function to get the checkpoint option
+    # Define a function to get the checkpoint object
     def get_checkpoint_obj(self):
         """
         Returns the tensorflow checkpoint object
@@ -1066,6 +1072,7 @@ Test set size = {self.X_test_n}
         return None
 
 
+# The following commands will be executed if running this program
 if __name__ == '__main__':
 
     # Set up the TensorFlow environment
@@ -1081,7 +1088,7 @@ if __name__ == '__main__':
         disc_updates = 5,
         grad_pen = 10,
         feature_range=(0,1),
-        seed = 1001,
+        seed = 1,
         data_path = "../DataPreprocessing/GSE114725",
         ckpt_path="../models",
         ckpt_freq = 2000,

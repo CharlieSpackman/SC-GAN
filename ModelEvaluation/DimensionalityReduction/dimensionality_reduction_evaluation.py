@@ -1,6 +1,6 @@
 # dimensionality_reduction_evaluation.py
 """
-Creates a neural network from the Discriminator where the final hidden layer is the outputs.
+Creates a neural network from the Discriminator where the first hidden layer is the output.
 Reduces the validation set and calculates cluster metrics compared to the baseline data.
 Creates plots of the GAN reduced data and baseline data.
 Creates expression profile plots for Discriminator outputs.
@@ -68,9 +68,9 @@ axis_size = 8
 
 # Update path to model for evaluation
 CHECKPOINT_PATH = get_path("../../models") ### Update this as required
-MODEL_NAME = "5e-05_300000_128_100_1001" ### Update this as required
+MODEL_NAME = "5e-05_300000_128_100_1" ### Update this as required
 EPOCH = 150000 ### Update this as required
-SEED = 1001 ### Update this as required
+SEED = 1 ### Update this as required
 
 # Get the latest saved model
 model_path = get_path(f"{CHECKPOINT_PATH}/{MODEL_NAME}/epochs/{EPOCH:05d}")
@@ -221,21 +221,23 @@ print("[INFO] Evaluation metrics created")
 
 # Create a mapping between classes and colours
 color_map = {
-    "B"   : "#00798c",
-    "MACROPHAGE"    : "#C77CFF",
-    "MAST" : "#edae49",
-    "NEUTROPHIL"  : "#66a182",
-    "NK"   : "#2e4057",
-    "NKT": "#8c8c8c",
-    "T": "#f37735",
-    "mDC": "#d11141",
-    "pDC":"#A6611A"}
+    "B"         :"#00798c",
+    "MACROPHAGE":"#C77CFF",
+    "MAST"      :"#edae49",
+    "NEUTROPHIL":"#66a182",
+    "NK"        :"#2e4057",
+    "NKT"       :"#8c8c8c",
+    "T"         :"#f37735",
+    "mDC"       :"#d11141",
+    "pDC"       :"#A6611A"
+    }
 
 patchList = []
 for key in color_map:
         data_key = plt.scatter([],[], s = point_size*3, marker=".", color = color_map[key], label=key)
         patchList.append(data_key)
 
+# Map colours to labels
 plot_colors = list(map(color_map.get, y_test))
 
 # Plot the results for sample correlation
