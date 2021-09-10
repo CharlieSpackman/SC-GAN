@@ -8,7 +8,6 @@ classification_metrics.py                   - computes prediction performance me
 dimensionality_reduction_evaluation.py      - compute dimensionality reduction metrics and reduces the dataset
 GSE114725_data_processing.py                - pre-processing for the filtered imputed values
 GSE114725_filter_data.py                    - removes outlier samples and samples 10000 items from the raw_imputed.csv 
-originality_avowal.txt                      - statement of originality
 requirements_python.txt                     - list of Python modules used
 requirements_R.txt                          - list of R packages used
 scPred.R                                    - trains scPred models on the GAN reduced and baseline data and outputs the cell type predictions
